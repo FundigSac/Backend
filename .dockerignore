@@ -1,0 +1,9 @@
+target/*
+!target/backend-0.0.1-SNAPSHOT.jar
+!.mvn/wrapper/maven-wrapper.jar
+.git
+.gitignore
+.idea
+*.iml
+.vscode
+*.log
