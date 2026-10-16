@@ -1,5 +1,7 @@
 # FUNDIGSAC · Backend
 
+[![CI](https://github.com/FundigSac/Backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/FundigSac/Backend/actions/workflows/ci.yml)
+
 API del sitio de FUNDIGSAC: catálogo técnico, cotizaciones B2B, consultas de contacto, Libro de Reclamaciones,
 privacidad (Ley N.° 29733), cuentas de clientes y panel del personal.
 
