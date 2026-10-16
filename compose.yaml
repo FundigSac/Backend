@@ -1,0 +1,125 @@
+# Entorno local completo: PostgreSQL 18, backend y Mailpit (bandeja de correos de prueba).
+# Primero genere los secretos:  sh scripts/generate-secrets.sh   (crea ./secrets, ignorado por Git)
+# Luego:                         docker compose up -d --build
+# API y Swagger UI:              http://localhost:8080/swagger-ui.html
+# Correos enviados:              http://localhost:8025
+name: fundigsac
+
+services:
+  postgres:
+    image: postgres:18.6-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fundigsac
+      POSTGRES_USER: fundigsac_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      # Conexiones por red: SCRAM-SHA-256. El socket local solo es accesible dentro del contenedor.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    secrets:
+      - postgres_superuser_password
+      - db_migrator_password
+      - db_app_password
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    command:
+      - postgres
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_connections=authorization
+      - -c
+      - log_min_duration_statement=500ms
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U fundigsac_admin -d fundigsac"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 128mb
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 1000
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:8025:8025"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+      - edge
+
+  backend:
+    build: .
+    image: fundigsac/backend:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,local
+      DB_URL: jdbc:postgresql://postgres:5432/fundigsac
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      SITE_URL: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      BOOTSTRAP_ADMIN_EMAIL: admin@fundigsac.local
+    secrets:
+      - db_migrator_password
+      - db_app_password
+      - jwt_private_key
+      - receipt_key
+      - bootstrap_admin_password
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+      - edge
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "2"
+
+networks:
+  # Red interna sin salida a Internet: la base de datos no se publica fuera de Docker.
+  data:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata:
+
+secrets:
+  postgres_superuser_password:
+    file: ./secrets/postgres_superuser_password
+  db_migrator_password:
+    file: ./secrets/db_migrator_password
+  db_app_password:
+    file: ./secrets/db_app_password
+  jwt_private_key:
+    file: ./secrets/jwt_private_key
+  receipt_key:
+    file: ./secrets/receipt_key
+  bootstrap_admin_password:
+    file: ./secrets/bootstrap_admin_password
