@@ -1,0 +1,21 @@
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+
+fundigsac:
+  web:
+    allowed-origins: http://localhost:3000
+  security:
+    allow-ephemeral-keys: true
+  identity:
+    jwt:
+      revocation-cache-ttl: PT0S
+    bootstrap-admin:
+      email: admin@fundigsac.test
+      password: Prueba-Segura-2026!
+  notifications:
+    delivery: log
+    poll-interval: PT1H
+    initial-delay: PT1H
+  events:
+    resubmit-interval: PT1H
