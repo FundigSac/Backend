@@ -1,0 +1,18 @@
+# Perfil docker: dos roles de base de datos (migraciones vs. aplicación) y secretos desde /run/secrets.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/fundigsac}
+    username: ${DB_APP_ROLE:fundigsac_app}
+    password: ${db_app_password}
+  flyway:
+    user: ${DB_MIGRATOR_ROLE:fundigsac_migrator}
+    password: ${db_migrator_password}
+
+fundigsac:
+  security:
+    receipt-key: ${receipt_key}
+  identity:
+    jwt:
+      private-key: ${jwt_private_key}
+    bootstrap-admin:
+      password: ${bootstrap_admin_password:}

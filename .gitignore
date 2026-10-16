@@ -1,33 +1,27 @@
-HELP.md
+# Compilación
 target/
 .mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# Secretos locales (scripts/generate-secrets.sh) y variables de entorno
+secrets/
+.env
+.env.*
+!.env.example
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+# IDE
+.idea/
 *.iml
+*.iws
 *.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
 .vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated
+.sts4-cache/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log

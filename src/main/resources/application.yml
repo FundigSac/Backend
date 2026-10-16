@@ -1,77 +1,151 @@
-server:
-  port: 8080
-  shutdown: graceful
-  compression:
-    enabled: true
-    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml
-    min-response-size: 1024
-  tomcat:
-    threads:
-      max: 200
-      min-spare: 20
-    connection-timeout: 20000
-
+# Configuración base (segura por defecto). Los secretos llegan como Docker secrets (/run/secrets, ver perfil docker)
+# o variables de entorno; nunca se escriben aquí. Perfiles: local (desarrollo), docker (roles de BD y secretos),
+# prod (logs JSON) y test.
 spring:
   application:
     name: fundigsac-backend
-
-  # Habilitación de Virtual Threads (Java 21 Project Loom) para máximo rendimiento I/O
+  config:
+    import: optional:configtree:/run/secrets/
+  main:
+    banner-mode: off
   threads:
     virtual:
       enabled: true
-
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fundigsac_db}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgrespassword}
-    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/fundigsac}
+    username: ${DB_USER:fundigsac}
+    password: ${DB_PASSWORD:}
     hikari:
-      pool-name: FundigsacHikariPool
-      maximum-pool-size: ${DB_POOL_MAX:20}
-      minimum-idle: ${DB_POOL_MIN:5}
-      idle-timeout: 300000
-      connection-timeout: 20000
-      max-lifetime: 1200000
+      pool-name: fundigsac
+      schema: fundigsac
+      maximum-pool-size: ${DB_POOL_MAX:15}
+      minimum-idle: 2
+      connection-timeout: 5000
+      max-lifetime: 1800000
       data-source-properties:
-        cachePrepStmts: true
-        prepStmtCacheSize: 250
-        prepStmtCacheSqlLimit: 2048
-        useServerPrepStmts: true
+        ApplicationName: fundigsac-backend
+        reWriteBatchedInserts: true
+  flyway:
+    schemas: fundigsac
+    default-schema: fundigsac
+    create-schemas: true
+    locations: classpath:db/migration
+    clean-disabled: true
+    validate-on-migrate: true
+    placeholders:
+      appRole: ${DB_APP_ROLE:fundigsac_app}
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
+      # Publicaciones completadas se borran: algunos eventos llevan tokens de un solo uso.
+      completion-mode: delete
+      republish-outstanding-events-on-restart: true
+  mvc:
+    problemdetails:
+      enabled: true
+  web:
+    # Mensajes de validación en español del Perú.
+    locale: es_PE
+    locale-resolver: fixed
+  jackson:
+    deserialization:
+      # Campos no declarados en un DTO se rechazan (400): evita la asignación masiva de atributos.
+      fail-on-unknown-properties: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
-  jpa:
-    open-in-view: false # Desactivado para evitar memory leaks y retención de conexiones
-    show-sql: false
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: false
-        jdbc:
-          batch_size: 30
-          order_inserts: true
-          order_updates: true
-          batch_versioned_data: true
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-    enabled: true
-  swagger-ui:
-    path: /swagger-ui.html
-    tags-sorter: alpha
-    operations-sorter: alpha
-    display-request-duration: true
-    try-it-out-enabled: true
-  show-actuator: true
+server:
+  port: 8080
+  shutdown: graceful
+  max-http-request-header-size: 16KB
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  tomcat:
+    max-swallow-size: 1MB
+    max-http-form-post-size: 64KB
+    connection-timeout: 10s
 
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,prometheus
   endpoint:
     health:
-      show-details: always
       probes:
         enabled: true
+      show-details: never
+  info:
+    env:
+      enabled: false
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+    path: /swagger-ui.html
+    urls-primary-name: "1. Pública (sin cuenta)"
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+    doc-expansion: none
+  default-produces-media-type: application/json
+
+logging:
+  level:
+    root: INFO
+    org.springframework.modulith: WARN
+
+fundigsac:
+  web:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+    max-body-bytes: 65536
+  security:
+    receipt-key: ${RECEIPT_KEY:}
+    allow-ephemeral-keys: false
+  identity:
+    jwt:
+      issuer: ${JWT_ISSUER:https://api.fundigsac.com}
+      audience: fundigsac-api
+      access-token-ttl: PT15M
+      private-key: ${JWT_PRIVATE_KEY:}
+    sessions:
+      customer-refresh-ttl: P14D
+      staff-refresh-ttl: PT12H
+    login:
+      max-failed-attempts: 5
+      lock-duration: PT15M
+    bootstrap-admin:
+      email: ${BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+  catalog:
+    files-base-url: ${SITE_URL:https://fundigsac-web.vercel.app}
+  notifications:
+    delivery: ${MAIL_DELIVERY:log}
+    from: ${MAIL_FROM:FUNDIGSAC <no-responder@fundigsac.local>}
+    site-url: ${SITE_URL:https://fundigsac-web.vercel.app}
+    sales-inbox: ${SALES_INBOX:ventas@fundigsac.local}
+    legal-inbox: ${LEGAL_INBOX:legal@fundigsac.local}
+    privacy-inbox: ${PRIVACY_INBOX:privacidad@fundigsac.local}
+  complaints:
+    # Art. 24 del Código de Protección y Defensa del Consumidor (Ley N.° 31435): Legal confirma y mantiene feriados.
+    response-business-days: 15
+    holidays: []
+  rate-limits:
+    enabled: true
+    policies:
+      public-form: { capacity: 5, period: PT10M }
+      register: { capacity: 5, period: PT1H }
+      login: { capacity: 10, period: PT15M }
+      password-reset: { capacity: 3, period: PT1H }
+      token: { capacity: 10, period: PT15M }
+      receipt: { capacity: 30, period: PT1M }
+      consent: { capacity: 30, period: PT1M }

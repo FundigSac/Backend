@@ -1,0 +1,14 @@
+# Perfil prod: logs JSON estructurados (ECS) para el agregador, cabeceras de proxy y documentación apagada.
+logging:
+  structured:
+    format:
+      console: ecs
+
+server:
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
