@@ -133,7 +133,8 @@ public final class UserAccount extends AggregateRoot {
 		UserAccount account = new UserAccount(id, AccountKind.CUSTOMER, email, null,
 				Guard.text("fullName", fullName, 2, 120), null, null, null, AccountStatus.ACTIVE, EnumSet.of(Role.CUSTOMER),
 				now, 0, null, 0, null, Guard.text("privacyNoticeVersion", privacyNoticeVersion, 1, 20), now, now, null, 0);
-		account.signup = new SignupProfile(SignupProfile.Method.GOOGLE, Guard.text("googleSubject", googleSubject, 1, 255));
+		account.signup = new SignupProfile(SignupProfile.Method.GOOGLE, null, null,
+				Guard.text("googleSubject", googleSubject, 1, 255));
 		account.register(new EmailVerified(id, now));
 		return account;
 	}
@@ -152,6 +153,11 @@ public final class UserAccount extends AggregateRoot {
 	}
 
 	// ----- alta -----
+
+	/** Desde qué página se registró y si aceptó el boletín (solo al crear la cuenta). */
+	public void recordSignupContext(@Nullable String source, boolean newsletter, Instant now) {
+		this.signup = this.signup.withContext(SignupProfile.source(source), newsletter, now);
+	}
 
 	/**
 	 * Ingreso con Google de una cuenta de cliente ya existente: queda vinculada a esa cuenta de Google y, como Google
@@ -338,7 +344,7 @@ public final class UserAccount extends AggregateRoot {
 		this.ruc = null;
 		this.phone = null;
 		this.passwordHash = null;
-		this.signup = new SignupProfile(this.signup.method(), null);
+		this.signup = new SignupProfile(this.signup.method(), this.signup.source(), null, null);
 		this.status = AccountStatus.DELETED;
 		this.securityStamp++;
 		this.deletedAt = now;

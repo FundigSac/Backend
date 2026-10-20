@@ -40,7 +40,8 @@ class AuthController {
 			@NotBlank(message = "Ingrese su nombre.") @Size(min = 2, max = 120) String fullName,
 			@Size(max = 160) String companyName, @Size(max = 11) String ruc, @Size(max = 24) String phone,
 			@NotBlank(message = "Indique la versión del aviso de privacidad mostrado.") @Size(max = 20) String privacyNoticeVersion,
-			@AssertTrue(message = "Debe aceptar el aviso de privacidad.") boolean acceptPrivacyNotice) {
+			@AssertTrue(message = "Debe aceptar el aviso de privacidad.") boolean acceptPrivacyNotice,
+			@Size(max = 12) String source, Boolean newsletter) {
 
 		@Override
 		public String toString() {
@@ -76,7 +77,8 @@ class AuthController {
 
 	}
 
-	record GoogleRequest(@NotBlank @Size(max = 4096) String idToken, @Size(max = 20) String privacyNoticeVersion) {
+	record GoogleRequest(@NotBlank @Size(max = 4096) String idToken, @Size(max = 20) String privacyNoticeVersion,
+			@Size(max = 12) String source, Boolean newsletter) {
 
 		@Override
 		public String toString() {
@@ -133,7 +135,8 @@ class AuthController {
 	@Operation(summary = "Registrar cuenta de cliente", description = "Responde 202 siempre igual (no revela si el correo ya existía) y envía el enlace de verificación.")
 	ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
 		this.registration.register(new RegistrationService.RegisterCustomer(request.email(), request.password(),
-				request.fullName(), request.companyName(), request.ruc(), request.phone(), request.privacyNoticeVersion()));
+				request.fullName(), request.companyName(), request.ruc(), request.phone(), request.privacyNoticeVersion(),
+				request.source(), Boolean.TRUE.equals(request.newsletter())));
 		return ResponseEntity.status(HttpStatus.ACCEPTED).body(ACCEPTED);
 	}
 
@@ -165,7 +168,7 @@ class AuthController {
 	@Operation(summary = "Ingresar con Google", description = "Recibe el ID token que obtuvo el frontend con OAuth 2.0 + PKCE y lo valida con las claves de Google. El primer ingreso crea la cuenta de cliente y exige privacyNoticeVersion.")
 	TokenResponse google(@Valid @RequestBody GoogleRequest request) {
 		return TokenResponse.of(this.google.signIn(new GoogleSignInService.GoogleSignIn(request.idToken(),
-				request.privacyNoticeVersion())));
+				request.privacyNoticeVersion(), request.source(), Boolean.TRUE.equals(request.newsletter()))));
 	}
 
 	@PostMapping("/refresh")

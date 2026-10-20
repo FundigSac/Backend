@@ -14,6 +14,7 @@ import com.fundigsac.identity.domain.AccountStatus;
 import com.fundigsac.identity.domain.OneTimeToken;
 import com.fundigsac.identity.domain.PasswordHasher;
 import com.fundigsac.identity.domain.PasswordPolicy;
+import com.fundigsac.identity.domain.SignupProfile;
 import com.fundigsac.identity.domain.UserAccount;
 import com.fundigsac.identity.domain.UserAccountRepository;
 import com.fundigsac.shared.application.DomainEvents;
@@ -30,7 +31,8 @@ import com.fundigsac.shared.domain.Ruc;
 public class RegistrationService {
 
 	public record RegisterCustomer(String email, String password, String fullName, @Nullable String companyName,
-			@Nullable String ruc, @Nullable String phone, String privacyNoticeVersion) {
+			@Nullable String ruc, @Nullable String phone, String privacyNoticeVersion, @Nullable String source,
+			boolean newsletter) {
 
 		@Override
 		public String toString() {
@@ -68,6 +70,7 @@ public class RegistrationService {
 		PasswordPolicy.check("password", command.password(), email.value());
 		Ruc ruc = Ruc.optional("ruc", command.ruc());
 		PhoneNumber phone = PhoneNumber.optional("phone", command.phone());
+		String source = SignupProfile.source(command.source());
 		var existing = this.accounts.findByEmail(email);
 		if (existing.isPresent()) {
 			this.hasher.hash(command.password()); // mismo costo de tiempo que un registro real
@@ -78,6 +81,7 @@ public class RegistrationService {
 		}
 		UserAccount account = UserAccount.registerCustomer(Ids.newId(), email, this.hasher.hash(command.password()),
 				command.fullName(), command.companyName(), ruc, phone, command.privacyNoticeVersion(), now);
+		account.recordSignupContext(source, command.newsletter(), now);
 		this.accounts.insert(account);
 		requestVerification(account, now);
 	}

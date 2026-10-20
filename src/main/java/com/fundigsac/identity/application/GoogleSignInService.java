@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fundigsac.identity.api.IdentityEvents.SignedIn;
 import com.fundigsac.identity.domain.GoogleIdTokenVerifier;
 import com.fundigsac.identity.domain.GoogleIdTokenVerifier.GoogleIdentity;
+import com.fundigsac.identity.domain.SignupProfile;
 import com.fundigsac.identity.domain.UserAccount;
 import com.fundigsac.identity.domain.UserAccountRepository;
 import com.fundigsac.shared.application.DomainEvents;
@@ -29,7 +30,8 @@ import com.fundigsac.shared.domain.ValidationException;
 @Service
 public class GoogleSignInService {
 
-	public record GoogleSignIn(String idToken, @Nullable String privacyNoticeVersion) {
+	public record GoogleSignIn(String idToken, @Nullable String privacyNoticeVersion, @Nullable String source,
+			boolean newsletter) {
 
 		@Override
 		public String toString() {
@@ -83,6 +85,7 @@ public class GoogleSignInService {
 			}
 			account = UserAccount.registerWithGoogle(Ids.newId(), email, identity.subject(), displayName(identity),
 					version, now);
+			account.recordSignupContext(command.source(), command.newsletter(), now);
 			account.recordSuccessfulLogin(now);
 			this.accounts.insert(account);
 		}

@@ -73,10 +73,12 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 		this.jdbc.sql("""
 				INSERT INTO user_accounts (id, kind, email, password_hash, full_name, company_name, ruc, phone, status,
 				    email_verified_at, failed_login_attempts, locked_until, security_stamp, last_login_at,
-				    privacy_notice_version, created_at, updated_at, deleted_at, version, signup_method, google_subject)
+				    privacy_notice_version, created_at, updated_at, deleted_at, version, signup_method, signup_source,
+				    newsletter_opt_in_at, google_subject)
 				VALUES (:id, :kind, :email, :passwordHash, :fullName, :companyName, :ruc, :phone, :status,
 				    :emailVerifiedAt, :failedLoginAttempts, :lockedUntil, :securityStamp, :lastLoginAt,
-				    :privacyNoticeVersion, :createdAt, :updatedAt, :deletedAt, 0, :signupMethod, :googleSubject)""")
+				    :privacyNoticeVersion, :createdAt, :updatedAt, :deletedAt, 0, :signupMethod, :signupSource,
+				    :newsletterOptInAt, :googleSubject)""")
 			.param("id", a.id())
 			.param("kind", a.kind().name())
 			.param("email", a.email().value())
@@ -96,6 +98,8 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 			.param("updatedAt", SqlTypes.ts(a.updatedAt()))
 			.param("deletedAt", SqlTypes.ts(a.deletedAt()))
 			.param("signupMethod", a.signup().method().name())
+			.param("signupSource", a.signup().source())
+			.param("newsletterOptInAt", SqlTypes.ts(a.signup().newsletterOptInAt()))
 			.param("googleSubject", a.signup().googleSubject())
 			.update();
 		insertRoles(a.id(), a.roles());
@@ -109,7 +113,8 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 				       ruc = :ruc, phone = :phone, status = :status, email_verified_at = :emailVerifiedAt,
 				       failed_login_attempts = :failedLoginAttempts, locked_until = :lockedUntil,
 				       security_stamp = :securityStamp, last_login_at = :lastLoginAt, updated_at = :updatedAt,
-				       deleted_at = :deletedAt, google_subject = :googleSubject, version = version + 1
+				       deleted_at = :deletedAt, google_subject = :googleSubject,
+				       newsletter_opt_in_at = :newsletterOptInAt, version = version + 1
 				 WHERE id = :id AND version = :version""")
 			.param("email", a.email().value())
 			.param("passwordHash", a.passwordHash())
@@ -126,6 +131,7 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 			.param("updatedAt", SqlTypes.ts(a.updatedAt()))
 			.param("deletedAt", SqlTypes.ts(a.deletedAt()))
 			.param("googleSubject", a.signup().googleSubject())
+			.param("newsletterOptInAt", SqlTypes.ts(a.signup().newsletterOptInAt()))
 			.param("id", a.id())
 			.param("version", a.version())
 			.update();
@@ -204,7 +210,7 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 				SqlTypes.instant(rs, "last_login_at"), rs.getString("privacy_notice_version"),
 				SqlTypes.instant(rs, "created_at"), SqlTypes.instant(rs, "updated_at"), SqlTypes.instant(rs, "deleted_at"),
 				rs.getLong("version"), new SignupProfile(SignupProfile.Method.valueOf(rs.getString("signup_method")),
-						rs.getString("google_subject")));
+						rs.getString("signup_source"), SqlTypes.instant(rs, "newsletter_opt_in_at"), rs.getString("google_subject")));
 	}
 
 }
