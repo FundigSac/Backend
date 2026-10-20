@@ -125,6 +125,13 @@ class IdentityIT extends IntegrationTest {
 		this.mvc.perform(authed(get("/api/v1/staff/users").with(randomIp()), sales)).andExpect(status().isForbidden());
 
 		String admin = adminToken();
+		// El listado del personal (con y sin búsqueda) incluye a quien se acaba de invitar.
+		this.mvc.perform(authed(get("/api/v1/staff/users").with(randomIp()), admin))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[*].email").value(org.hamcrest.Matchers.hasItem("ventas.prueba@fundigsac.test")));
+		this.mvc.perform(authed(get("/api/v1/staff/users").param("q", "ventas.prueba").with(randomIp()), admin))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalItems").value(1));
 		String id = this.jdbc.sql("SELECT id FROM user_accounts WHERE email = 'ventas.prueba@fundigsac.test'").query(String.class).single();
 		long version = this.jdbc.sql("SELECT version FROM user_accounts WHERE email = 'ventas.prueba@fundigsac.test'").query(Long.class).single();
 		this.mvc.perform(authed(postJson("/api/v1/staff/users/" + id + "/disable", Map.of()), admin)

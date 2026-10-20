@@ -153,7 +153,8 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 
 	@Override
 	public List<UserAccount> findStaff(@Nullable String query, int limit, long offset) {
-		return this.jdbc.sql(SELECT + """
+		// Espacio explícito: el bloque de texto empieza sin sangría y quedaría pegado al alias ("uWHERE").
+		return this.jdbc.sql(SELECT + " " + """
 				 WHERE u.kind = 'STAFF' AND u.status <> 'DELETED'
 				   AND (CAST(:q AS text) IS NULL OR u.email ILIKE '%' || :q || '%' OR u.full_name ILIKE '%' || :q || '%')
 				 ORDER BY u.full_name, u.id
