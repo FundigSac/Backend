@@ -75,7 +75,15 @@ services:
       MAIL_HOST: mailpit
       MAIL_PORT: "1025"
       SITE_URL: http://localhost:3000
+      # Panel interno (gestor de usuarios): las invitaciones del personal llevan a su /login.
+      ADMIN_URL: http://localhost:3110
       CORS_ALLOWED_ORIGINS: http://localhost:3000
+      # El sitio y el panel llaman a la API desde su servidor (BFF) y reenvían la IP del visitante en
+      # X-Forwarded-For. Tomcat solo la acepta de proxies de red interna (Docker, loopback), así los límites
+      # por IP siguen siendo por visitante y no por servidor.
+      FORWARD_HEADERS_STRATEGY: native
+      # Mismo cliente OAuth "Aplicación web" del sitio (opcional; vacío deshabilita el ingreso con Google).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       BOOTSTRAP_ADMIN_EMAIL: admin@fundigsac.local
     secrets:
       - db_migrator_password
