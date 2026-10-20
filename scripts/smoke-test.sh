@@ -1,10 +1,11 @@
 #!/bin/sh
 # Prueba de humo contra el backend en marcha (docker compose up -d). Recorre los flujos principales y muestra el
-# código HTTP de cada paso. Uso: sh scripts/smoke-test.sh [http://localhost:8080]
+# código HTTP de cada paso. Uso: sh scripts/smoke-test.sh [http://localhost:8080] [http://localhost:8025 (Mailpit)]
 # Los JSON van por stdin (--data-binary @-) para conservar UTF-8 también en Windows.
 set -u
 
 B="${1:-http://localhost:8080}"
+M="${2:-http://localhost:8025}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 J="Content-Type: application/json"
 FAILED=0
@@ -58,6 +59,30 @@ check "POST cambio de estado con If-Match" 200 "$(printf '%s' '{"status":"IN_REV
 check "GET bandeja legal" 200 "$(code "$B/api/v1/staff/complaints?q=$REC" -H "Authorization: Bearer $AT")"
 check "GET auditoría" 200 "$(code "$B/api/v1/staff/audit?resourceType=QUOTE" -H "Authorization: Bearer $AT")"
 check "GET correos (bandeja de salida)" 200 "$(code "$B/api/v1/staff/notifications" -H "Authorization: Bearer $AT")"
+
+echo "Panel interno (acceso sin contraseña y directorio de cuentas)"
+SEARCH="$M/api/v1/search?query=to%3Aadmin%40fundigsac.local%20subject%3Aacceso&limit=1"
+PREV=$(curl -s "$SEARCH" | field ID)
+check "POST código de acceso del personal" 202 "$(printf '%s' '{"email":"admin@fundigsac.local"}' | code -X POST "$B/api/v1/auth/staff/code" -H "$J" --data-binary @-)"
+# El despachador de correos corre cada 5 s: se espera en Mailpit un mensaje nuevo (hasta 20 s). Su extracto (Snippet)
+# trae el texto en una línea: "...panel interno es: 123456 Vence...".
+LOGIN_CODE=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  LATEST=$(curl -s "$SEARCH")
+  if [ -n "$LATEST" ] && [ "$(printf '%s' "$LATEST" | field ID)" != "$PREV" ]; then
+    LOGIN_CODE=$(printf '%s' "$LATEST" | sed -n 's/.*panel interno es: \([0-9]\{6\}\) .*/\1/p' | head -1)
+  fi
+  [ -n "$LOGIN_CODE" ] && break
+  sleep 2
+done
+check "Código recibido en Mailpit" 6 "${#LOGIN_CODE}"
+check "POST ingreso con código incorrecto" 401 "$(printf '{"email":"admin@fundigsac.local","code":"%s"}' "$( [ "$LOGIN_CODE" = 000000 ] && echo 111111 || echo 000000)" | code -X POST "$B/api/v1/auth/staff/code/verify" -H "$J" --data-binary @-)"
+check "POST ingreso con código" 200 "$(printf '{"email":"admin@fundigsac.local","code":"%s"}' "$LOGIN_CODE" | code -X POST "$B/api/v1/auth/staff/code/verify" -H "$J" --data-binary @-)"
+PT=$(field accessToken < /tmp/fundigsac-smoke.json)
+check "GET directorio de cuentas" 200 "$(code "$B/api/v1/staff/accounts?kind=CUSTOMER&sort=registeredAt" -H "Authorization: Bearer $PT")"
+check "GET indicadores (30 días)" 200 "$(code "$B/api/v1/staff/accounts/stats?range=30d" -H "Authorization: Bearer $PT")"
+check "GET actividad de cuentas" 200 "$(code "$B/api/v1/staff/accounts/activity?type=LOGIN" -H "Authorization: Bearer $PT")"
+check "GET filtro de directorio no válido" 400 "$(code "$B/api/v1/staff/accounts?status=BORRADA" -H "Authorization: Bearer $PT")"
 
 echo
 [ "$FAILED" = 0 ] && echo "Todo correcto. Folios: $FOLIO, $REC" || { echo "Hubo fallos."; exit 1; }
