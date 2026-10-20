@@ -72,6 +72,36 @@ public final class IdentityEvents {
 
 	}
 
+	/** Inicio de sesión correcto (contraseña, código del personal o Google). */
+	public record SignedIn(UUID userId, String method, Instant occurredAt) implements AuditableEvent {
+
+		@Override
+		public String auditAction() {
+			return "SIGNED_IN";
+		}
+
+		@Override
+		public String auditResourceType() {
+			return "USER";
+		}
+
+		@Override
+		public String auditResourceId() {
+			return this.userId.toString();
+		}
+
+		@Override
+		public @Nullable UUID actorId() {
+			return this.userId;
+		}
+
+		@Override
+		public Map<String, String> auditDetails() {
+			return Map.of("method", this.method);
+		}
+
+	}
+
 	public record EmailVerified(UUID userId, Instant occurredAt) implements AuditableEvent {
 
 		@Override

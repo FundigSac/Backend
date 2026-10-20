@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fundigsac.identity.api.IdentityEvents.SignedIn;
 import com.fundigsac.identity.domain.AccountStatus;
 import com.fundigsac.identity.domain.LoginPolicy;
 import com.fundigsac.identity.domain.PasswordHasher;
@@ -85,6 +86,7 @@ public class AuthenticationService {
 		account.recordSuccessfulLogin(now);
 		this.accounts.update(account);
 		this.events.publishFrom(account);
+		this.events.publish(new SignedIn(account.id(), "PASSWORD", now));
 		return this.sessions.issue(account, Ids.newId(), Ids.newId(), now);
 	}
 
