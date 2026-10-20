@@ -126,6 +126,8 @@ fundigsac:
     bootstrap-admin:
       email: ${BOOTSTRAP_ADMIN_EMAIL:}
       password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
   catalog:
     files-base-url: ${SITE_URL:https://fundigsac-web.vercel.app}
   notifications:

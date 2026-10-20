@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import com.fundigsac.identity.domain.AccountKind;
 import com.fundigsac.identity.domain.AccountStatus;
 import com.fundigsac.identity.domain.Role;
+import com.fundigsac.identity.domain.SignupProfile;
 import com.fundigsac.identity.domain.UserAccount;
 import com.fundigsac.identity.domain.UserAccountRepository;
 import com.fundigsac.shared.domain.Email;
@@ -52,6 +53,14 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 	}
 
 	@Override
+	public Optional<UserAccount> findByGoogleSubject(String subject) {
+		return this.jdbc.sql(SELECT + " WHERE u.google_subject = :subject AND u.status <> 'DELETED'")
+			.param("subject", subject)
+			.query(this::map)
+			.optional();
+	}
+
+	@Override
 	public boolean existsByEmail(Email email) {
 		return this.jdbc.sql("SELECT EXISTS (SELECT 1 FROM user_accounts WHERE email = :email AND status <> 'DELETED')")
 			.param("email", email.value())
@@ -64,10 +73,10 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 		this.jdbc.sql("""
 				INSERT INTO user_accounts (id, kind, email, password_hash, full_name, company_name, ruc, phone, status,
 				    email_verified_at, failed_login_attempts, locked_until, security_stamp, last_login_at,
-				    privacy_notice_version, created_at, updated_at, deleted_at, version)
+				    privacy_notice_version, created_at, updated_at, deleted_at, version, signup_method, google_subject)
 				VALUES (:id, :kind, :email, :passwordHash, :fullName, :companyName, :ruc, :phone, :status,
 				    :emailVerifiedAt, :failedLoginAttempts, :lockedUntil, :securityStamp, :lastLoginAt,
-				    :privacyNoticeVersion, :createdAt, :updatedAt, :deletedAt, 0)""")
+				    :privacyNoticeVersion, :createdAt, :updatedAt, :deletedAt, 0, :signupMethod, :googleSubject)""")
 			.param("id", a.id())
 			.param("kind", a.kind().name())
 			.param("email", a.email().value())
@@ -86,6 +95,8 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 			.param("createdAt", SqlTypes.ts(a.createdAt()))
 			.param("updatedAt", SqlTypes.ts(a.updatedAt()))
 			.param("deletedAt", SqlTypes.ts(a.deletedAt()))
+			.param("signupMethod", a.signup().method().name())
+			.param("googleSubject", a.signup().googleSubject())
 			.update();
 		insertRoles(a.id(), a.roles());
 	}
@@ -98,7 +109,7 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 				       ruc = :ruc, phone = :phone, status = :status, email_verified_at = :emailVerifiedAt,
 				       failed_login_attempts = :failedLoginAttempts, locked_until = :lockedUntil,
 				       security_stamp = :securityStamp, last_login_at = :lastLoginAt, updated_at = :updatedAt,
-				       deleted_at = :deletedAt, version = version + 1
+				       deleted_at = :deletedAt, google_subject = :googleSubject, version = version + 1
 				 WHERE id = :id AND version = :version""")
 			.param("email", a.email().value())
 			.param("passwordHash", a.passwordHash())
@@ -114,6 +125,7 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 			.param("lastLoginAt", SqlTypes.ts(a.lastLoginAt()))
 			.param("updatedAt", SqlTypes.ts(a.updatedAt()))
 			.param("deletedAt", SqlTypes.ts(a.deletedAt()))
+			.param("googleSubject", a.signup().googleSubject())
 			.param("id", a.id())
 			.param("version", a.version())
 			.update();
@@ -191,7 +203,8 @@ class JdbcUserAccountRepository implements UserAccountRepository {
 				rs.getInt("failed_login_attempts"), SqlTypes.instant(rs, "locked_until"), rs.getInt("security_stamp"),
 				SqlTypes.instant(rs, "last_login_at"), rs.getString("privacy_notice_version"),
 				SqlTypes.instant(rs, "created_at"), SqlTypes.instant(rs, "updated_at"), SqlTypes.instant(rs, "deleted_at"),
-				rs.getLong("version"));
+				rs.getLong("version"), new SignupProfile(SignupProfile.Method.valueOf(rs.getString("signup_method")),
+						rs.getString("google_subject")));
 	}
 
 }

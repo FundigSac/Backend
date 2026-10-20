@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, FakeGoogleConfiguration.class })
 public abstract class IntegrationTest {
 
 	public static final String ADMIN_EMAIL = "admin@fundigsac.test";

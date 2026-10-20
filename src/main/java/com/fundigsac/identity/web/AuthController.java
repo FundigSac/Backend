@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fundigsac.identity.application.AuthTokens;
 import com.fundigsac.identity.application.AuthenticationService;
+import com.fundigsac.identity.application.GoogleSignInService;
 import com.fundigsac.identity.application.PasswordResetService;
 import com.fundigsac.identity.application.RegistrationService;
 import com.fundigsac.shared.web.RateLimited;
@@ -75,6 +76,15 @@ class AuthController {
 
 	}
 
+	record GoogleRequest(@NotBlank @Size(max = 4096) String idToken, @Size(max = 20) String privacyNoticeVersion) {
+
+		@Override
+		public String toString() {
+			return "GoogleRequest[***]";
+		}
+
+	}
+
 	record EmailRequest(@NotBlank @Email @Size(max = 254) String email) {
 	}
 
@@ -108,11 +118,14 @@ class AuthController {
 
 	private final PasswordResetService passwords;
 
+	private final GoogleSignInService google;
+
 	AuthController(RegistrationService registration, AuthenticationService authentication,
-			PasswordResetService passwords) {
+			PasswordResetService passwords, GoogleSignInService google) {
 		this.registration = registration;
 		this.authentication = authentication;
 		this.passwords = passwords;
+		this.google = google;
 	}
 
 	@PostMapping("/register")
@@ -145,6 +158,14 @@ class AuthController {
 	@Operation(summary = "Iniciar sesión", description = "Devuelve un JWT de acceso (15 min) y un refresh token rotativo. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.")
 	TokenResponse login(@Valid @RequestBody LoginRequest request) {
 		return TokenResponse.of(this.authentication.login(request.email(), request.password()));
+	}
+
+	@PostMapping("/google")
+	@RateLimited("login")
+	@Operation(summary = "Ingresar con Google", description = "Recibe el ID token que obtuvo el frontend con OAuth 2.0 + PKCE y lo valida con las claves de Google. El primer ingreso crea la cuenta de cliente y exige privacyNoticeVersion.")
+	TokenResponse google(@Valid @RequestBody GoogleRequest request) {
+		return TokenResponse.of(this.google.signIn(new GoogleSignInService.GoogleSignIn(request.idToken(),
+				request.privacyNoticeVersion())));
 	}
 
 	@PostMapping("/refresh")

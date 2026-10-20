@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("fundigsac.identity")
 public record IdentityProperties(@DefaultValue Jwt jwt, @DefaultValue Sessions sessions, @DefaultValue Tokens tokens,
-		@DefaultValue Login login, @DefaultValue BootstrapAdmin bootstrapAdmin) {
+		@DefaultValue Login login, @DefaultValue BootstrapAdmin bootstrapAdmin, @DefaultValue Google google) {
 
 	/**
 	 * @param issuer emisor (claim iss)
@@ -48,6 +48,13 @@ public record IdentityProperties(@DefaultValue Jwt jwt, @DefaultValue Sessions s
 
 	public record BootstrapAdmin(@Nullable String email, @DefaultValue("Administrador FUNDIGSAC") String fullName,
 			@Nullable String password) {
+	}
+
+	/**
+	 * @param clientId cliente OAuth "Aplicación web" de Google (el mismo del frontend); vacío deshabilita el ingreso con
+	 * Google
+	 */
+	public record Google(@Nullable String clientId) {
 	}
 
 }

@@ -16,10 +16,12 @@ import com.fundigsac.identity.api.IdentityEvents.UserStatusChanged;
 import com.fundigsac.shared.domain.AggregateRoot;
 import com.fundigsac.shared.domain.ConflictException;
 import com.fundigsac.shared.domain.Email;
+import com.fundigsac.shared.domain.ForbiddenException;
 import com.fundigsac.shared.domain.Guard;
 import com.fundigsac.shared.domain.PhoneNumber;
 import com.fundigsac.shared.domain.Ruc;
 import com.fundigsac.shared.domain.RuleViolationException;
+import com.fundigsac.shared.domain.UnauthorizedException;
 import com.fundigsac.shared.domain.ValidationException;
 import com.fundigsac.shared.security.Permission;
 
@@ -68,6 +70,8 @@ public final class UserAccount extends AggregateRoot {
 	private @Nullable Instant deletedAt;
 
 	private final long version;
+
+	private SignupProfile signup = SignupProfile.email();
 
 	private UserAccount(UUID id, AccountKind kind, Email email, @Nullable String passwordHash, String fullName,
 			@Nullable String companyName, @Nullable Ruc ruc, @Nullable PhoneNumber phone, AccountStatus status,
@@ -120,15 +124,60 @@ public final class UserAccount extends AggregateRoot {
 				0);
 	}
 
+	/**
+	 * Cliente que entra por primera vez con Google: Google ya verificó el correo, así que la cuenta nace activa y sin
+	 * contraseña. Igual que en el registro por correo, debe constar qué versión del aviso de privacidad aceptó.
+	 */
+	public static UserAccount registerWithGoogle(UUID id, Email email, String googleSubject, String fullName,
+			String privacyNoticeVersion, Instant now) {
+		UserAccount account = new UserAccount(id, AccountKind.CUSTOMER, email, null,
+				Guard.text("fullName", fullName, 2, 120), null, null, null, AccountStatus.ACTIVE, EnumSet.of(Role.CUSTOMER),
+				now, 0, null, 0, null, Guard.text("privacyNoticeVersion", privacyNoticeVersion, 1, 20), now, now, null, 0);
+		account.signup = new SignupProfile(SignupProfile.Method.GOOGLE, Guard.text("googleSubject", googleSubject, 1, 255));
+		account.register(new EmailVerified(id, now));
+		return account;
+	}
+
 	public static UserAccount rehydrate(UUID id, AccountKind kind, Email email, @Nullable String passwordHash,
 			String fullName, @Nullable String companyName, @Nullable Ruc ruc, @Nullable PhoneNumber phone,
 			AccountStatus status, Set<Role> roles, @Nullable Instant emailVerifiedAt, int failedLoginAttempts,
 			@Nullable Instant lockedUntil, int securityStamp, @Nullable Instant lastLoginAt,
 			@Nullable String privacyNoticeVersion, Instant createdAt, Instant updatedAt, @Nullable Instant deletedAt,
-			long version) {
-		return new UserAccount(id, kind, email, passwordHash, fullName, companyName, ruc, phone, status,
+			long version, SignupProfile signup) {
+		UserAccount account = new UserAccount(id, kind, email, passwordHash, fullName, companyName, ruc, phone, status,
 				roles.isEmpty() ? EnumSet.noneOf(Role.class) : roles, emailVerifiedAt, failedLoginAttempts, lockedUntil,
 				securityStamp, lastLoginAt, privacyNoticeVersion, createdAt, updatedAt, deletedAt, version);
+		account.signup = signup;
+		return account;
+	}
+
+	// ----- alta -----
+
+	/**
+	 * Ingreso con Google de una cuenta de cliente ya existente: queda vinculada a esa cuenta de Google y, como Google
+	 * verificó el correo, una cuenta pendiente de verificación se activa.
+	 */
+	public void signInWithGoogle(String googleSubject, Instant now) {
+		requireLive();
+		if (this.kind != AccountKind.CUSTOMER) {
+			throw new ForbiddenException("STAFF_USE_PANEL", "El personal ingresa por el panel interno.");
+		}
+		if (this.status == AccountStatus.DISABLED) {
+			throw new UnauthorizedException("INVALID_CREDENTIALS", "No se pudo iniciar sesión con Google.");
+		}
+		String linked = this.signup.googleSubject();
+		if (linked != null && !linked.equals(googleSubject)) {
+			throw new UnauthorizedException("INVALID_CREDENTIALS", "No se pudo iniciar sesión con Google.");
+		}
+		if (linked == null) {
+			this.signup = this.signup.withGoogle(Guard.text("googleSubject", googleSubject, 1, 255));
+		}
+		if (this.status == AccountStatus.PENDING_VERIFICATION) {
+			this.status = AccountStatus.ACTIVE;
+			this.emailVerifiedAt = now;
+			register(new EmailVerified(this.id, now));
+		}
+		recordSuccessfulLogin(now);
 	}
 
 	// ----- inicio de sesión -----
@@ -289,6 +338,7 @@ public final class UserAccount extends AggregateRoot {
 		this.ruc = null;
 		this.phone = null;
 		this.passwordHash = null;
+		this.signup = new SignupProfile(this.signup.method(), null);
 		this.status = AccountStatus.DELETED;
 		this.securityStamp++;
 		this.deletedAt = now;
@@ -402,6 +452,10 @@ public final class UserAccount extends AggregateRoot {
 
 	public long version() {
 		return this.version;
+	}
+
+	public SignupProfile signup() {
+		return this.signup;
 	}
 
 }

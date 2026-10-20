@@ -18,6 +18,9 @@ public interface UserAccountRepository {
 
 	boolean existsByEmail(Email email);
 
+	/** Cuenta viva vinculada a esa cuenta de Google (sub). */
+	Optional<UserAccount> findByGoogleSubject(String subject);
+
 	void insert(UserAccount account);
 
 	void update(UserAccount account);
