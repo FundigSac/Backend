@@ -99,7 +99,7 @@ public abstract class IntegrationTest {
 	/** Espera el correo de una plantilla y devuelve el primer grupo del patrón dentro de su cuerpo. */
 	protected String tokenFromOutboxBody(String template, String recipient, Pattern pattern) {
 		String[] body = new String[1];
-		Awaitility.await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+		Awaitility.await().atMost(Duration.ofSeconds(15)).ignoreExceptions().untilAsserted(() -> {
 			body[0] = this.jdbc.sql("""
 					SELECT body FROM email_outbox WHERE template = :template AND recipient = :recipient AND body IS NOT NULL
 					 ORDER BY created_at DESC LIMIT 1""")
