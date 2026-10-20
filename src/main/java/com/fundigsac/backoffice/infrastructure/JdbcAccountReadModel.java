@@ -42,6 +42,8 @@ class JdbcAccountReadModel implements AccountReadModel {
 			(SELECT count(*) FROM quote_cart_items c WHERE c.owner_id = u.id) AS cart_items,
 			(SELECT count(*) FROM refresh_tokens t
 			  WHERE t.user_id = u.id AND t.revoked_at IS NULL AND t.expires_at > now()) AS active_sessions,
+			(SELECT count(*) FROM audit_events a
+			  WHERE a.resource_type = 'USER' AND a.resource_id = u.id::text AND a.action = 'SIGNED_IN') AS sign_ins,
 			(SELECT n.notes FROM account_notes n WHERE n.user_id = u.id) AS notes, u.version""";
 
 	private static final String CUSTOMERS = " FROM user_accounts u WHERE u.kind = 'CUSTOMER' AND u.status <> 'DELETED'";
@@ -289,7 +291,8 @@ class JdbcAccountReadModel implements AccountReadModel {
 				rs.getString("status"), SqlTypes.textArray(rs, "roles"), rs.getBoolean("email_verified"),
 				rs.getBoolean("newsletter"), rs.getString("privacy_notice_version"), rs.getString("signup_source"),
 				SqlTypes.instant(rs, "created_at"), SqlTypes.instant(rs, "last_login_at"), rs.getLong("quotes"),
-				rs.getLong("cart_items"), rs.getLong("active_sessions"), rs.getString("notes"), rs.getLong("version"));
+				rs.getLong("cart_items"), rs.getLong("active_sessions"), rs.getLong("sign_ins"), rs.getString("notes"),
+				rs.getLong("version"));
 	}
 
 }

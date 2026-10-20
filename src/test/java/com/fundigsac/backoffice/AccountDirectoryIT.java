@@ -91,6 +91,10 @@ class AccountDirectoryIT extends IntegrationTest {
 			.andExpect(jsonPath("$.items[*].type").value(hasItem("SIGNUP")))
 			.andExpect(jsonPath("$.items[*].type").value(hasItem("VERIFY")))
 			.andExpect(jsonPath("$.items[*].type").value(hasItem("LOGIN"))));
+		// La ficha cuenta los inicios de sesión de la auditoría (no las sesiones abiertas).
+		this.mvc.perform(authed(get("/api/v1/staff/accounts/" + id).with(randomIp()), admin))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.signIns").value(1));
 	}
 
 	@Test

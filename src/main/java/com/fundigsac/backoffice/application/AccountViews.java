@@ -18,7 +18,7 @@ public final class AccountViews {
 	public record AccountRow(UUID id, String kind, String fullName, String email, @Nullable String companyName,
 			@Nullable String ruc, @Nullable String phone, String signupMethod, String status, List<String> roles,
 			boolean emailVerified, boolean newsletter, @Nullable String privacyNoticeVersion, @Nullable String signupSource,
-			Instant createdAt, @Nullable Instant lastLoginAt, long quotes, long cartItems, long activeSessions,
+			Instant createdAt, @Nullable Instant lastLoginAt, long quotes, long cartItems, long activeSessions, long signIns,
 			@Nullable String notes, long version) {
 	}
 
