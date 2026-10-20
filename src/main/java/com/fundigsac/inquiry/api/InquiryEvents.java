@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 import com.fundigsac.shared.domain.AuditableEvent;
+import com.fundigsac.shared.domain.DomainEvent;
 
 /** Eventos de consultas de contacto. */
 public final class InquiryEvents {
@@ -45,6 +46,17 @@ public final class InquiryEvents {
 		@Override
 		public String toString() {
 			return "InquiryReceived[folio=" + this.folio + "]";
+		}
+
+	}
+
+	/** Respuesta del personal a una consulta: se envía por correo a quien la presentó. */
+	public record InquiryAnswered(UUID inquiryId, String folio, String fullName, String email, String responseText,
+			Instant occurredAt) implements DomainEvent {
+
+		@Override
+		public String toString() {
+			return "InquiryAnswered[folio=" + this.folio + "]";
 		}
 
 	}

@@ -67,6 +67,18 @@ class EmailTemplates {
 				""".formatted(name, folio, format(at)) + SIGNATURE);
 	}
 
+	Message inquiryAnswer(String name, String folio, String response) {
+		return new Message("FUNDIGSAC: respuesta a su consulta " + folio, """
+				Hola %s:
+
+				En atención a su consulta %s, le respondemos:
+
+				%s
+
+				Si necesita algo más, responda a nuestros canales de contacto indicando su folio.
+				""".formatted(name, folio, response) + SIGNATURE);
+	}
+
 	Message inquiryForSales(String folio, String company, String name, String reason) {
 		return new Message("Nueva consulta " + folio + " - " + company, """
 				Se registró la consulta %s.

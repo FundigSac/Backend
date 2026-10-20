@@ -18,6 +18,7 @@ import com.fundigsac.identity.api.IdentityEvents.RegistrationAttemptOnExistingAc
 import com.fundigsac.identity.api.IdentityEvents.StaffInvited;
 import com.fundigsac.identity.api.IdentityEvents.StaffLoginCodeRequested;
 import com.fundigsac.identity.api.IdentityEvents.VerificationEmailRequested;
+import com.fundigsac.inquiry.api.InquiryEvents.InquiryAnswered;
 import com.fundigsac.inquiry.api.InquiryEvents.InquiryReceived;
 import com.fundigsac.notification.domain.EmailOutboxRepository;
 import com.fundigsac.notification.domain.OutgoingEmail;
@@ -65,6 +66,12 @@ class NotificationListeners {
 		enqueue("INQUIRY_RECEIPT", e.folio(), e.occurredAt(), e.email(), this.templates.inquiryReceipt(e.fullName(), e.folio(), e.occurredAt()));
 		enqueue("INQUIRY_SALES", e.folio(), e.occurredAt(), this.properties.salesInbox(),
 				this.templates.inquiryForSales(e.folio(), e.companyName(), e.fullName(), e.reason()));
+	}
+
+	@ApplicationModuleListener
+	public void on(InquiryAnswered e) {
+		enqueue("INQUIRY_ANSWER", e.folio(), e.occurredAt(), e.email(),
+				this.templates.inquiryAnswer(e.fullName(), e.folio(), e.responseText()));
 	}
 
 	@ApplicationModuleListener

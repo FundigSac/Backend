@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
 
+import com.fundigsac.inquiry.api.InquiryEvents.InquiryAnswered;
 import com.fundigsac.inquiry.api.InquiryEvents.InquiryReceived;
 import com.fundigsac.inquiry.api.InquiryEvents.InquiryStatusChanged;
 import com.fundigsac.shared.domain.AggregateRoot;
@@ -143,6 +144,11 @@ public final class Inquiry extends AggregateRoot {
 		this.updatedAt = now;
 		this.newEvents.add(new Event(Ids.newId(), from, to, note, actorId, now));
 		register(new InquiryStatusChanged(this.id, this.folio.value(), from.name(), to.name(), this.assigneeId, actorId, now));
+		// La nota al marcarla como respondida es la respuesta: se envía por correo a quien escribió.
+		if (to == Status.ANSWERED && note != null) {
+			register(new InquiryAnswered(this.id, this.folio.value(), this.sender.fullName(), this.sender.email().value(), note,
+					now));
+		}
 	}
 
 	public List<Event> drainNewEvents() {
