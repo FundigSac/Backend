@@ -194,6 +194,26 @@ public final class IdentityEvents {
 
 	}
 
+	/** El personal corrigió los datos de perfil de una cuenta. */
+	public record AccountUpdatedByStaff(UUID userId, UUID actorId, Instant occurredAt) implements AuditableEvent {
+
+		@Override
+		public String auditAction() {
+			return "USER_UPDATED";
+		}
+
+		@Override
+		public String auditResourceType() {
+			return "USER";
+		}
+
+		@Override
+		public String auditResourceId() {
+			return this.userId.toString();
+		}
+
+	}
+
 	public record UserRolesChanged(UUID userId, Set<String> roles, UUID actorId, Instant occurredAt)
 			implements AuditableEvent {
 
@@ -245,7 +265,8 @@ public final class IdentityEvents {
 	}
 
 	/** El cliente eliminó su cuenta: los módulos que guardan datos suyos los retiran (p. ej. el carrito). */
-	public record AccountDeleted(UUID userId, Instant occurredAt) implements AuditableEvent {
+	/** Cuenta anonimizada a pedido del titular (deletedBy nulo) o por el personal que atendió su solicitud. */
+	public record AccountDeleted(UUID userId, @Nullable UUID deletedBy, Instant occurredAt) implements AuditableEvent {
 
 		@Override
 		public String auditAction() {
@@ -264,7 +285,7 @@ public final class IdentityEvents {
 
 		@Override
 		public @Nullable UUID actorId() {
-			return this.userId;
+			return this.deletedBy == null ? this.userId : this.deletedBy;
 		}
 
 	}

@@ -47,7 +47,7 @@ public final class AccountViews {
 	/**
 	 * Un hecho de la actividad de las cuentas.
 	 *
-	 * @param type SIGNUP, LOGIN, VERIFY, QUOTE, PASSWORD, DISABLE, ENABLE, ROLES, DELETE o INVITE
+	 * @param type SIGNUP, LOGIN, VERIFY, QUOTE, PASSWORD, DISABLE, ENABLE, ROLES, UPDATE, DELETE o INVITE
 	 * @param actorName quién lo hizo cuando no fue el propio usuario (personal)
 	 */
 	public record ActivityRow(String id, Instant at, String type, UUID userId, String userName, @Nullable String actorName,

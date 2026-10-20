@@ -62,7 +62,7 @@ class AccountDirectoryController {
 
 	@GetMapping("/activity")
 	@Operation(summary = "Actividad de las cuentas",
-			description = "type: SIGNUP, LOGIN, VERIFY, QUOTE, PASSWORD, DISABLE, ENABLE, ROLES, DELETE o INVITE.")
+			description = "type: SIGNUP, LOGIN, VERIFY, QUOTE, PASSWORD, DISABLE, ENABLE, ROLES, UPDATE, DELETE o INVITE.")
 	PageResult<ActivityRow> activity(@RequestParam(required = false) @Size(max = 100) String q,
 			@RequestParam(required = false) @Size(max = 10) String type, @RequestParam(required = false) UUID userId,
 			@RequestParam(required = false) @Min(0) Integer page, @RequestParam(required = false) @Min(1) @Max(100) Integer size) {

@@ -183,6 +183,7 @@ class JdbcAccountReadModel implements AccountReadModel {
 				           WHEN 'USER_ROLES_CHANGED' THEN 'ROLES'
 				           WHEN 'STAFF_INVITED' THEN 'INVITE'
 				           WHEN 'ACCOUNT_DELETED' THEN 'DELETE'
+				           WHEN 'USER_UPDATED' THEN 'UPDATE'
 				           WHEN 'USER_STATUS_CHANGED' THEN CASE WHEN a.details ->> 'status' = 'DISABLED' THEN 'DISABLE' ELSE 'ENABLE' END
 				       END AS type,
 				       CAST(a.resource_id AS uuid) AS user_id,
@@ -191,7 +192,7 @@ class JdbcAccountReadModel implements AccountReadModel {
 				  FROM audit_events a
 				 WHERE a.resource_type = 'USER'
 				   AND a.action IN ('SIGNED_IN', 'EMAIL_VERIFIED', 'PASSWORD_RESET', 'PASSWORD_CHANGED', 'USER_ROLES_CHANGED',
-				                    'STAFF_INVITED', 'ACCOUNT_DELETED', 'USER_STATUS_CHANGED')
+				                    'STAFF_INVITED', 'ACCOUNT_DELETED', 'USER_STATUS_CHANGED', 'USER_UPDATED')
 				UNION ALL
 				SELECT 'usr_' || u.id, u.created_at, 'SIGNUP', u.id, NULL, u.signup_method
 				  FROM user_accounts u WHERE u.kind = 'CUSTOMER'

@@ -44,7 +44,7 @@ public class AccountDirectoryService {
 			"CATALOG_REVIEWER", "LEGAL_SUPPORT", "READ_ONLY");
 
 	private static final Set<String> ACTIVITY = Set.of("SIGNUP", "LOGIN", "VERIFY", "QUOTE", "PASSWORD", "DISABLE",
-			"ENABLE", "ROLES", "DELETE", "INVITE");
+			"ENABLE", "ROLES", "UPDATE", "DELETE", "INVITE");
 
 	/** "Todo el historial" en el gráfico diario se limita a los últimos 120 días para que siga siendo legible. */
 	private static final int ALL_TIME_DAYS = 120;

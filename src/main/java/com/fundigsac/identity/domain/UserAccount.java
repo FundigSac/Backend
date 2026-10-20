@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 
 import com.fundigsac.identity.api.IdentityEvents.AccountDeleted;
 import com.fundigsac.identity.api.IdentityEvents.AccountLocked;
+import com.fundigsac.identity.api.IdentityEvents.AccountUpdatedByStaff;
 import com.fundigsac.identity.api.IdentityEvents.EmailVerified;
 import com.fundigsac.identity.api.IdentityEvents.PasswordChanged;
 import com.fundigsac.identity.api.IdentityEvents.UserRolesChanged;
@@ -294,6 +295,13 @@ public final class UserAccount extends AggregateRoot {
 		this.updatedAt = now;
 	}
 
+	/** Corrección de datos hecha por el personal (queda en la auditoría con quién la hizo). */
+	public void updateProfileByStaff(String fullName, @Nullable String companyName, @Nullable Ruc ruc,
+			@Nullable PhoneNumber phone, UUID actorId, Instant now) {
+		updateProfile(fullName, companyName, ruc, phone, now);
+		register(new AccountUpdatedByStaff(this.id, actorId, now));
+	}
+
 	// ----- administración del personal -----
 
 	public void changeRoles(Set<Role> newRoles, UUID actorId, Instant now) {
@@ -337,6 +345,15 @@ public final class UserAccount extends AggregateRoot {
 	 * reclamaciones que presentó conservan su copia por obligación legal.
 	 */
 	public void delete(Instant now) {
+		anonymize(null, now);
+	}
+
+	/** Eliminación hecha por el personal al atender la solicitud de supresión del titular. */
+	public void deleteByStaff(UUID actorId, Instant now) {
+		anonymize(actorId, now);
+	}
+
+	private void anonymize(@Nullable UUID actorId, Instant now) {
 		requireLive();
 		this.email = new Email("eliminada-" + this.id.toString().replace("-", "") + "@cuentas-eliminadas.invalid");
 		this.fullName = "Cuenta eliminada";
@@ -349,7 +366,7 @@ public final class UserAccount extends AggregateRoot {
 		this.securityStamp++;
 		this.deletedAt = now;
 		this.updatedAt = now;
-		register(new AccountDeleted(this.id, now));
+		register(new AccountDeleted(this.id, actorId, now));
 	}
 
 	public Set<Permission> permissions() {
