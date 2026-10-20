@@ -5,9 +5,11 @@
 API del sitio de FUNDIGSAC: catálogo técnico, cotizaciones B2B, consultas de contacto, Libro de Reclamaciones,
 privacidad (Ley N.° 29733), cuentas de clientes y panel del personal.
 
-> **Estado:** backend y base de datos completos y probados. **No está conectado al frontend todavía**: el sitio sigue
-> funcionando con sus datos actuales. Los datos de demostración provienen del sitio y quedan marcados como no
-> verificados (`dataVerified = false`) hasta que Ingeniería los valide.
+> **Estado:** backend y base de datos completos, probados y **conectados en local** con el sitio (carpeta
+> `../Frontend`) y el gestor de usuarios (`../Gestor de usuarios`), ambos a través de un BFF en Next.js con cookies
+> `HttpOnly`. Sin `BACKEND_URL`, el sitio y el panel siguen funcionando como antes (envío por correo o WhatsApp y
+> datos de demostración). Los datos del catálogo provienen del sitio y quedan marcados como no verificados
+> (`dataVerified = false`) hasta que Ingeniería los valide.
 
 ## Arquitectura
 
@@ -86,19 +88,42 @@ docker compose up -d --build
 El administrador inicial es `admin@fundigsac.local`; su contraseña está en `secrets/bootstrap_admin_password`. En
 Swagger: `POST /api/v1/auth/login`, copie `accessToken` y péguelo en **Authorize**.
 
-Prueba de humo de todos los flujos principales contra el entorno en marcha:
+Prueba de humo de todos los flujos principales contra el entorno en marcha (incluye el acceso del personal con el
+código que llega a Mailpit):
 
 ```bash
 sh scripts/smoke-test.sh
 ```
 
-## Endpoints (83 operaciones, prefijo `/api/v1`)
+### Todo integrado (sitio + panel + API)
+
+El navegador nunca llama a la API: el sitio y el panel la usan desde su propio servidor (BFF), reenvían la IP del
+visitante (`FORWARD_HEADERS_STRATEGY=native`, solo desde redes internas) y guardan los tokens en cookies `HttpOnly`
+firmadas que solo viajan a sus rutas `/api`.
+
+| App | Variables | Arranque |
+|---|---|---|
+| Sitio (`../Frontend`, :3000) | `BACKEND_URL=http://localhost:8080`, `AUTH_SECRET` (y `GOOGLE_CLIENT_ID`/`SECRET` para Google) | `npx next dev --port 3000` |
+| Panel (`../Gestor de usuarios`, :3110) | `NEXT_PUBLIC_DATA_SOURCE=backend`, `BACKEND_URL=http://localhost:8080`, `ADMIN_AUTH_SECRET` | `npx next dev --port 3110` |
+| API (este repositorio) | `.env` opcional con `GOOGLE_CLIENT_ID` (el mismo del sitio) para el ingreso con Google | `docker compose up -d --build` |
+
+- **Sitio:** registro, verificación por correo, ingreso, recuperación de contraseña, Google, cotizaciones (con folio y
+  constancia), consultas, Libro de Reclamaciones, solicitudes de eliminación y consentimiento de cookies.
+- **Panel:** el personal entra **sin contraseña** con un código de 6 dígitos que llega al correo
+  (`POST /auth/staff/code` y `/code/verify`: 10 minutos, un solo uso, 5 intentos, 60 s entre envíos). Ve el directorio
+  de todas las cuentas con indicadores y actividad, invita personal, corrige datos, suspende, reactiva, anonimiza y
+  atiende las colas de cotizaciones, consultas, reclamaciones y privacidad.
+- **Límites por IP en local:** sin un proxy de confianza todas las peticiones llegan desde la misma IP; si se prueban
+  muchos formularios seguidos aparece 429 (5 cada 10 minutos). `docker restart fundigsac-backend-1` vacía los
+  contadores.
+
+## Endpoints (prefijo `/api/v1`)
 
 | Grupo | Endpoints |
 |---|---|
-| Pública (18) | `catalog/categories`, `catalog/products` (filtros `q`, `category`, `family`, `joint`, `dn`, `pn`, `homologation`, `sector`), `catalog/products/{slug}`, `catalog/filters`, `catalog/sectors`, `resources`, `resources/{slug}/download`, `POST quotes`, `quotes/{folio}/receipt`, `POST complaints`, `complaints/{folio}/receipt`, `POST inquiries`, `legal/{type}`, `POST privacy/consents`, `POST privacy/requests` |
-| Acceso y cuenta (21) | `auth/register`, `verify-email`, `login`, `refresh`, `logout`, `password/forgot`, `password/reset`, `invitation/accept`; `account/me`, `account/password`, `DELETE account`, `account/quotes`; `cart`, `cart/items`, `cart/submit` |
-| Personal (44) | Bandejas de `quotes`, `inquiries`, `complaints` y `privacy/requests` (asignar, estados, responder); `catalog/products` y `catalog/documents` (borrador → revisión → publicación); `users` (invitar, roles, desactivar); `legal/{type}/versions`; `audit`; `notifications` |
+| Pública | `catalog/categories`, `catalog/products` (filtros `q`, `category`, `family`, `joint`, `dn`, `pn`, `homologation`, `sector`), `catalog/products/{slug}`, `catalog/filters`, `catalog/sectors`, `resources`, `resources/{slug}/download`, `POST quotes`, `quotes/{folio}/receipt`, `POST complaints`, `complaints/{folio}/receipt`, `POST inquiries`, `legal/{type}`, `POST privacy/consents`, `POST privacy/requests` |
+| Acceso y cuenta | `auth/register`, `verify-email`, `login`, `google`, `staff/code`, `staff/code/verify`, `refresh`, `logout`, `password/forgot`, `password/reset`, `invitation/accept`; `account/me`, `account/password`, `DELETE account`, `account/quotes`; `cart`, `cart/items`, `cart/submit` |
+| Personal | `accounts` (directorio de clientes y personal con filtros y conteos, `stats`, `activity`, ficha, corrección de datos, desactivar, reactivar, reenviar verificación, enlace de contraseña, notas internas, anonimizar); bandejas de `quotes`, `inquiries`, `complaints` y `privacy/requests` (asignar, estados, responder); `catalog/products` y `catalog/documents` (borrador → revisión → publicación); `users` (invitar, roles, desactivar); `legal/{type}/versions`; `audit`; `notifications` |
 
 Convenciones: errores RFC 9457 (`application/problem+json`) con `code`, `errors[]` y `requestId`; los formularios
 públicos aceptan `Idempotency-Key` (un reintento devuelve el mismo folio); las modificaciones del personal exigen
@@ -106,7 +131,9 @@ públicos aceptan `Idempotency-Key` (un reintento devuelve el mismo folio); las 
 
 ## Seguridad
 
-- **Autenticación:** JWT RS256 de 15 minutos más refresh token opaco rotativo. Si se reutiliza un refresh token, se
+- **Autenticación:** JWT RS256 de 15 minutos más refresh token opaco rotativo. El personal entra sin contraseña con un
+  código de un solo uso enviado al correo (solo se guarda su hash) y los clientes también pueden entrar con Google: la
+  API valida el ID token con las claves públicas de Google (emisor, audiencia y `email_verified`). Si se reutiliza un refresh token, se
   revoca toda la familia. Los JWT llevan un sello de seguridad que invalida los tokens en segundos al cambiar la
   contraseña, los roles o el estado de la cuenta.
 - **Contraseñas:** Argon2id con los parámetros de OWASP y política NIST (12 a 128 caracteres, rechaza contraseñas
@@ -130,7 +157,9 @@ públicos aceptan `Idempotency-Key` (un reintento devuelve el mismo folio); las 
 
 ## Base de datos
 
-Diez migraciones versionadas (`src/main/resources/db/migration`), una por módulo, en el esquema `fundigsac`:
+Quince migraciones versionadas (`src/main/resources/db/migration`) en el esquema `fundigsac`: una por módulo (V1 a
+V10) y las de la integración (V11 códigos de acceso del personal, V12 Google, V13 origen del alta y boletín, V14
+búsqueda sin tildes, V15 notas internas):
 
 - **Roles separados:** `fundigsac_migrator` (dueño del esquema, solo Flyway) y `fundigsac_app` (solo DML). Además, la
   aplicación **no puede** modificar ni borrar `audit_events`, historiales, hojas de reclamación ni textos legales.
@@ -151,12 +180,14 @@ Diez migraciones versionadas (`src/main/resources/db/migration`), una por módul
 ```
 
 - 37 pruebas unitarias y de arquitectura (reglas de dominio, valores, límites de módulos y capas).
-- 37 pruebas de integración con PostgreSQL 18 real en Testcontainers (requiere Docker): flujos completos, seguridad,
-  idempotencia, concurrencia optimista, eventos, correos y protecciones de la base de datos.
+- 55 pruebas de integración con PostgreSQL 18 real en Testcontainers (requiere Docker): flujos completos, seguridad,
+  idempotencia, concurrencia optimista, eventos, correos, acceso con código y con Google (verificador de prueba, sin
+  Internet), directorio del panel y protecciones de la base de datos.
 
 ## Antes de producción
 
-- Conectar el frontend (recomendado: un BFF en Next.js que guarde los tokens en cookies `HttpOnly`).
+- Publicar la API (y su base de datos) en un servidor y cargar `BACKEND_URL` en los proyectos de Vercel del sitio y del
+  panel; hoy la integración corre en local con Docker.
 - PostgreSQL administrado con TLS (`sslmode=verify-full`), respaldos y restauración probada.
 - Proveedor SMTP transaccional (SPF, DKIM y DMARC) y gestor de secretos.
 - Con varias instancias, los límites por IP deben pasar a un almacén compartido (Bucket4j sobre PostgreSQL o Redis).
