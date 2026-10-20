@@ -32,8 +32,15 @@ public record IdentityProperties(@DefaultValue Jwt jwt, @DefaultValue Sessions s
 			@DefaultValue("PT12H") Duration staffRefreshTtl) {
 	}
 
+	/**
+	 * @param staffLoginCodeTtl vida del código de acceso del personal
+	 * @param staffLoginCodeResend espera mínima para pedir otro código
+	 * @param staffLoginCodeAttempts intentos por código
+	 */
 	public record Tokens(@DefaultValue("P1D") Duration emailVerificationTtl,
-			@DefaultValue("PT30M") Duration passwordResetTtl, @DefaultValue("P3D") Duration staffInvitationTtl) {
+			@DefaultValue("PT30M") Duration passwordResetTtl, @DefaultValue("P3D") Duration staffInvitationTtl,
+			@DefaultValue("PT10M") Duration staffLoginCodeTtl, @DefaultValue("PT60S") Duration staffLoginCodeResend,
+			@DefaultValue("5") int staffLoginCodeAttempts) {
 	}
 
 	public record Login(@DefaultValue("5") int maxFailedAttempts, @DefaultValue("PT15M") Duration lockDuration) {

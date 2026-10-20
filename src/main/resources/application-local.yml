@@ -24,3 +24,4 @@ fundigsac:
   notifications:
     delivery: ${MAIL_DELIVERY:smtp}
     site-url: ${SITE_URL:http://localhost:3000}
+    admin-url: ${ADMIN_URL:http://localhost:3110}

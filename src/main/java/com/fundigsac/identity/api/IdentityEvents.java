@@ -72,6 +72,17 @@ public final class IdentityEvents {
 
 	}
 
+	/** Enviar el código de acceso al panel interno (personal, sin contraseña). */
+	public record StaffLoginCodeRequested(UUID userId, String email, String fullName, String code, Instant expiresAt,
+			Instant occurredAt) implements DomainEvent {
+
+		@Override
+		public String toString() {
+			return "StaffLoginCodeRequested[userId=" + this.userId + "]";
+		}
+
+	}
+
 	/** Inicio de sesión correcto (contraseña, código del personal o Google). */
 	public record SignedIn(UUID userId, String method, Instant occurredAt) implements AuditableEvent {
 

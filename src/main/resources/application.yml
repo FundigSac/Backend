@@ -132,6 +132,7 @@ fundigsac:
     delivery: ${MAIL_DELIVERY:log}
     from: ${MAIL_FROM:FUNDIGSAC <no-responder@fundigsac.local>}
     site-url: ${SITE_URL:https://fundigsac-web.vercel.app}
+    admin-url: ${ADMIN_URL:https://fundigsac-admin.vercel.app}
     sales-inbox: ${SALES_INBOX:ventas@fundigsac.local}
     legal-inbox: ${LEGAL_INBOX:legal@fundigsac.local}
     privacy-inbox: ${PRIVACY_INBOX:privacidad@fundigsac.local}
@@ -147,5 +148,6 @@ fundigsac:
       login: { capacity: 10, period: PT15M }
       password-reset: { capacity: 3, period: PT1H }
       token: { capacity: 10, period: PT15M }
+      login-code: { capacity: 5, period: PT15M }
       receipt: { capacity: 30, period: PT1M }
       consent: { capacity: 30, period: PT1M }

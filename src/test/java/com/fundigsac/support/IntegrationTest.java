@@ -42,6 +42,8 @@ public abstract class IntegrationTest {
 
 	private static final Pattern TOKEN = Pattern.compile("#token=([A-Za-z0-9_-]{20,})");
 
+	private static final Pattern LOGIN_CODE = Pattern.compile("(?m)^\\s+(\\d{6})\\s*$");
+
 	@Autowired
 	protected MockMvc mvc;
 
@@ -91,6 +93,11 @@ public abstract class IntegrationTest {
 
 	/** Espera a que el correo de una plantilla llegue a la bandeja de salida y devuelve el token del enlace. */
 	protected String tokenFromOutbox(String template, String recipient) {
+		return tokenFromOutboxBody(template, recipient, TOKEN);
+	}
+
+	/** Espera el correo de una plantilla y devuelve el primer grupo del patrón dentro de su cuerpo. */
+	protected String tokenFromOutboxBody(String template, String recipient, Pattern pattern) {
 		String[] body = new String[1];
 		Awaitility.await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
 			body[0] = this.jdbc.sql("""
@@ -102,7 +109,7 @@ public abstract class IntegrationTest {
 				.optional()
 				.orElseThrow();
 		});
-		Matcher m = TOKEN.matcher(body[0]);
+		Matcher m = pattern.matcher(body[0]);
 		if (!m.find()) {
 			throw new IllegalStateException("Sin token en el correo " + template);
 		}
@@ -130,14 +137,25 @@ public abstract class IntegrationTest {
 		return login(email, password);
 	}
 
-	/** Personal invitado por el administrador con los roles dados; devuelve su token de acceso. */
-	protected String staffToken(String email, String password, String... roles) throws Exception {
+	/** Personal invitado por el administrador con los roles dados; entra con el código del correo y devuelve su token. */
+	protected String staffToken(String email, String... roles) throws Exception {
 		this.mvc.perform(authed(postJson("/api/v1/staff/users",
 				Map.of("email", email, "fullName", "Personal de Prueba", "roles", java.util.List.of(roles))), adminToken()))
 			.andReturn();
-		String token = tokenFromOutbox("STAFF_INVITATION", email);
-		this.mvc.perform(postJson("/api/v1/auth/invitation/accept", Map.of("token", token, "password", password))).andReturn();
-		return login(email, password);
+		tokenFromOutboxBody("STAFF_INVITATION", email, Pattern.compile("(/login)"));
+		this.mvc.perform(postJson("/api/v1/auth/staff/code", Map.of("email", email))).andReturn();
+		String code = loginCodeFromOutbox(email);
+		MvcResult result = this.mvc.perform(postJson("/api/v1/auth/staff/code/verify", Map.of("email", email, "code", code)))
+			.andReturn();
+		if (result.getResponse().getStatus() != 200) {
+			throw new IllegalStateException("Ingreso con código falló: " + result.getResponse().getContentAsString());
+		}
+		return body(result).get("accessToken").asString();
+	}
+
+	/** Código de 6 dígitos del último correo de acceso enviado al personal. */
+	protected String loginCodeFromOutbox(String recipient) {
+		return tokenFromOutboxBody("STAFF_LOGIN_CODE", recipient, LOGIN_CODE);
 	}
 
 }

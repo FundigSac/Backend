@@ -154,6 +154,28 @@ public final class UserAccount extends AggregateRoot {
 		this.updatedAt = now;
 	}
 
+	/** El personal puede pedir un código de acceso si está activo o invitado, y no bloqueado. */
+	public boolean canRequestLoginCode(Instant now) {
+		return this.kind == AccountKind.STAFF && !isLocked(now)
+				&& (this.status == AccountStatus.ACTIVE || this.status == AccountStatus.PENDING_VERIFICATION);
+	}
+
+	/**
+	 * Acceso con el código enviado al correo: demuestra la propiedad del correo, así que el personal invitado queda
+	 * activo y verificado con su primer ingreso.
+	 */
+	public void signInWithLoginCode(Instant now) {
+		if (!canRequestLoginCode(now)) {
+			throw new RuleViolationException("LOGIN_CODE_NOT_ALLOWED", "La cuenta no puede ingresar con código.");
+		}
+		if (this.status == AccountStatus.PENDING_VERIFICATION) {
+			this.status = AccountStatus.ACTIVE;
+			this.emailVerifiedAt = now;
+			register(new EmailVerified(this.id, now));
+		}
+		recordSuccessfulLogin(now);
+	}
+
 	// ----- verificación y contraseña -----
 
 	public void verifyEmail(Instant now) {
@@ -246,7 +268,9 @@ public final class UserAccount extends AggregateRoot {
 		if (this.status != AccountStatus.DISABLED) {
 			throw new ConflictException("NOT_DISABLED", "La cuenta no está desactivada.");
 		}
-		this.status = this.passwordHash == null ? AccountStatus.PENDING_VERIFICATION : AccountStatus.ACTIVE;
+		// El personal que ya verificó su correo entra con código: no necesita contraseña para volver a estar activo.
+		boolean hasCredentials = this.passwordHash != null || (this.kind == AccountKind.STAFF && this.emailVerifiedAt != null);
+		this.status = hasCredentials ? AccountStatus.ACTIVE : AccountStatus.PENDING_VERIFICATION;
 		this.failedLoginAttempts = 0;
 		this.lockedUntil = null;
 		this.updatedAt = now;

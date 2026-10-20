@@ -41,8 +41,8 @@ class CatalogAdminIT extends IntegrationTest {
 
 	@Test
 	void editorDraftsAndAnotherPersonPublishes() throws Exception {
-		String editor = staffToken("editor@fundigsac.test", "palabra-secreta-de-edicion", "CATALOG_EDITOR");
-		String reviewer = staffToken("revisor@fundigsac.test", "palabra-secreta-de-revision", "CATALOG_REVIEWER");
+		String editor = staffToken("editor@fundigsac.test", "CATALOG_EDITOR");
+		String reviewer = staffToken("revisor@fundigsac.test", "CATALOG_REVIEWER");
 
 		JsonNode created = body(this.mvc.perform(authed(postJson("/api/v1/staff/catalog/products", draft(true)), editor))
 			.andExpect(status().isCreated())

@@ -117,7 +117,7 @@ class IdentityIT extends IntegrationTest {
 
 	@Test
 	void administratorManagesStaffAndDisablingRevokesAccess() throws Exception {
-		String sales = staffToken("ventas.prueba@fundigsac.test", "clave-de-ventas-2026", "SALES");
+		String sales = staffToken("ventas.prueba@fundigsac.test", "SALES");
 		this.mvc.perform(authed(get("/api/v1/staff/profile").with(randomIp()), sales))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.hasItem("quote:manage")));

@@ -16,6 +16,7 @@ import com.fundigsac.identity.api.IdentityEvents.PasswordChanged;
 import com.fundigsac.identity.api.IdentityEvents.PasswordResetRequested;
 import com.fundigsac.identity.api.IdentityEvents.RegistrationAttemptOnExistingAccount;
 import com.fundigsac.identity.api.IdentityEvents.StaffInvited;
+import com.fundigsac.identity.api.IdentityEvents.StaffLoginCodeRequested;
 import com.fundigsac.identity.api.IdentityEvents.VerificationEmailRequested;
 import com.fundigsac.inquiry.api.InquiryEvents.InquiryReceived;
 import com.fundigsac.notification.domain.EmailOutboxRepository;
@@ -116,7 +117,13 @@ class NotificationListeners {
 	@ApplicationModuleListener
 	public void on(StaffInvited e) {
 		enqueue("STAFF_INVITATION", e.userId().toString(), e.occurredAt(), e.email(),
-				this.templates.staffInvitation(e.fullName(), e.token(), e.expiresAt()));
+				this.templates.staffInvitation(e.fullName(), e.email()));
+	}
+
+	@ApplicationModuleListener
+	public void on(StaffLoginCodeRequested e) {
+		enqueue("STAFF_LOGIN_CODE", e.userId().toString(), e.occurredAt(), e.email(),
+				this.templates.staffLoginCode(e.fullName(), e.code(), e.expiresAt()));
 	}
 
 	@ApplicationModuleListener

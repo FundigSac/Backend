@@ -159,15 +159,29 @@ class EmailTemplates {
 				""".formatted(name, site(), token, format(expiresAt)) + SIGNATURE);
 	}
 
-	Message staffInvitation(String name, String token, Instant expiresAt) {
+	/** El personal entra sin contraseña: la invitación solo indica dónde ingresar con su correo. */
+	Message staffInvitation(String name, String email) {
 		return new Message("FUNDIGSAC: invitación al panel interno", """
 				Hola %s:
 
-				Le crearon una cuenta en el panel interno de FUNDIGSAC. Defina su contraseña en este enlace:
-				%s/acceso/invitacion#token=%s
+				Le crearon una cuenta en el panel interno de FUNDIGSAC. Para ingresar, abra:
+				%s/login
 
-				El enlace vence el %s (hora de Lima).
-				""".formatted(name, site(), token, format(expiresAt)) + SIGNATURE);
+				Escriba su correo (%s) y le enviaremos un código de 6 dígitos. No necesita contraseña.
+				""".formatted(name, admin(), email) + SIGNATURE);
+	}
+
+	Message staffLoginCode(String name, String code, Instant expiresAt) {
+		return new Message("FUNDIGSAC: su código de acceso al panel interno", """
+				Hola %s:
+
+				Su código para ingresar al panel interno es:
+
+				    %s
+
+				Vence el %s (hora de Lima) y sirve una sola vez. Nadie de FUNDIGSAC se lo pedirá: no lo comparta. Si usted
+				no intentó ingresar, ignore este mensaje.
+				""".formatted(name, code, format(expiresAt)) + SIGNATURE);
 	}
 
 	Message registrationAttempt(String name) {
@@ -198,7 +212,14 @@ class EmailTemplates {
 	}
 
 	private String site() {
-		String url = this.properties.siteUrl();
+		return trimSlash(this.properties.siteUrl());
+	}
+
+	private String admin() {
+		return trimSlash(this.properties.adminUrl());
+	}
+
+	private static String trimSlash(String url) {
 		return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
 	}
 
