@@ -19,7 +19,7 @@ public final class AccountViews {
 			@Nullable String ruc, @Nullable String phone, String signupMethod, String status, List<String> roles,
 			boolean emailVerified, boolean newsletter, @Nullable String privacyNoticeVersion, @Nullable String signupSource,
 			Instant createdAt, @Nullable Instant lastLoginAt, long quotes, long cartItems, long activeSessions,
-			long version) {
+			@Nullable String notes, long version) {
 	}
 
 	/** Página de cuentas más los conteos por estado con los mismos filtros (menos el estado), para las pestañas. */

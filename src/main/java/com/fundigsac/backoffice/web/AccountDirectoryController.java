@@ -5,18 +5,23 @@ import java.util.UUID;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fundigsac.backoffice.application.AccountDirectoryService;
+import com.fundigsac.backoffice.application.AccountNotesService;
 import com.fundigsac.backoffice.application.AccountViews.AccountPage;
 import com.fundigsac.backoffice.application.AccountViews.AccountRow;
 import com.fundigsac.backoffice.application.AccountViews.AccountStats;
@@ -33,10 +38,16 @@ import com.fundigsac.shared.web.ETags;
 @Tag(name = "Personal: cuentas", description = "Directorio de todas las cuentas del sitio, indicadores y actividad")
 class AccountDirectoryController {
 
+	record NotesRequest(@NotNull @Size(max = 2000) String notes) {
+	}
+
 	private final AccountDirectoryService directory;
 
-	AccountDirectoryController(AccountDirectoryService directory) {
+	private final AccountNotesService notes;
+
+	AccountDirectoryController(AccountDirectoryService directory, AccountNotesService notes) {
 		this.directory = directory;
+		this.notes = notes;
 	}
 
 	@GetMapping
@@ -73,6 +84,13 @@ class AccountDirectoryController {
 	@Operation(summary = "Ficha de una cuenta", description = "Devuelve ETag con la versión para modificarla.")
 	ResponseEntity<AccountRow> get(@PathVariable UUID id) {
 		AccountRow row = this.directory.get(id);
+		return ResponseEntity.ok().eTag(ETags.of(row.version())).body(row);
+	}
+
+	@PutMapping("/{id}/notes")
+	@Operation(summary = "Guardar la nota interna de una cuenta", description = "Hasta 2000 caracteres; vacía la borra. El cliente no la ve.")
+	ResponseEntity<AccountRow> saveNotes(@PathVariable UUID id, @Valid @RequestBody NotesRequest request) {
+		AccountRow row = this.notes.save(id, request.notes());
 		return ResponseEntity.ok().eTag(ETags.of(row.version())).body(row);
 	}
 

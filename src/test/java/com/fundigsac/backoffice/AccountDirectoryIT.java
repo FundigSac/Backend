@@ -10,7 +10,9 @@ import tools.jackson.databind.JsonNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -89,6 +91,35 @@ class AccountDirectoryIT extends IntegrationTest {
 			.andExpect(jsonPath("$.items[*].type").value(hasItem("SIGNUP")))
 			.andExpect(jsonPath("$.items[*].type").value(hasItem("VERIFY")))
 			.andExpect(jsonPath("$.items[*].type").value(hasItem("LOGIN"))));
+	}
+
+	@Test
+	void staffNotesAreSavedClearedAndDeletedWithTheAccount() throws Exception {
+		String customer = customerToken("notas@empresa.pe", "frase-de-paso-muy-larga");
+		assertThat(customer).isNotBlank();
+		String admin = adminToken();
+		String id = this.jdbc.sql("SELECT id FROM user_accounts WHERE email = 'notas@empresa.pe'").query(String.class).single();
+
+		this.mvc.perform(authed(put("/api/v1/staff/accounts/" + id + "/notes").with(randomIp())
+			.contentType("application/json")
+			.content("{\"notes\":\"  Llamar el lunes por la cotización de válvulas  \"}"), admin))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.notes").value("Llamar el lunes por la cotización de válvulas"));
+		this.mvc.perform(authed(put("/api/v1/staff/accounts/" + id + "/notes").with(randomIp())
+			.contentType("application/json")
+			.content("{\"notes\":\"" + "x".repeat(2001) + "\"}"), admin)).andExpect(status().isBadRequest());
+
+		this.mvc.perform(authed(put("/api/v1/staff/accounts/" + id + "/notes").with(randomIp())
+			.contentType("application/json")
+			.content("{\"notes\":\"Cliente con obra en Arequipa\"}"), admin)).andExpect(status().isOk());
+		String etag = this.mvc.perform(authed(get("/api/v1/staff/accounts/" + id).with(randomIp()), admin))
+			.andReturn()
+			.getResponse()
+			.getHeader("ETag");
+		this.mvc.perform(authed(delete("/api/v1/staff/accounts/" + id).with(randomIp()), admin).header("If-Match", etag))
+			.andExpect(status().isNoContent());
+		org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() -> assertThat(
+				count("SELECT count(*) FROM account_notes WHERE user_id = CAST(:id AS uuid)", Map.of("id", id))).isZero());
 	}
 
 	@Test
