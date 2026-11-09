@@ -129,10 +129,10 @@ class AccountDirectoryIT extends IntegrationTest {
 	@Test
 	void onlyUserManagersCanReadTheDirectory() throws Exception {
 		String sales = staffToken("ventas.directorio@fundigsac.test", "SALES");
-		this.mvc.perform(authed(get("/api/v1/staff/accounts").with(randomIp()), sales)).andExpect(status().isForbidden());
-		this.mvc.perform(authed(get("/api/v1/staff/accounts/stats").with(randomIp()), sales)).andExpect(status().isForbidden());
+		this.mvc.perform(authed(get("/api/v1/staff/accounts").with(randomIp()), sales)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+		this.mvc.perform(authed(get("/api/v1/staff/accounts/stats").with(randomIp()), sales)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
 		String customer = customerToken("curioso@empresa.pe", "frase-de-paso-muy-larga");
-		this.mvc.perform(authed(get("/api/v1/staff/accounts").with(randomIp()), customer)).andExpect(status().isForbidden());
+		this.mvc.perform(authed(get("/api/v1/staff/accounts").with(randomIp()), customer)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
 	}
 
 }

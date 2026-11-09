@@ -12,7 +12,7 @@ import com.fundigsac.notification.domain.MailGateway;
 
 /**
  * Envío por SMTP (Mailpit en desarrollo, proveedor transaccional en producción) o, con delivery=log, solo registro
- * (sin destinatario ni contenido en el log).
+ * (sin destinatario, asunto ni contenido en el log: el asunto puede llevar el nombre de la empresa).
  */
 @Component
 class ConfiguredMailGateway implements MailGateway {
@@ -31,7 +31,7 @@ class ConfiguredMailGateway implements MailGateway {
 	@Override
 	public void send(String to, String subject, String body) {
 		if (!"smtp".equalsIgnoreCase(this.properties.delivery())) {
-			log.info("Correo no enviado (delivery=log): \"{}\"", subject);
+			log.info("Correo no enviado (delivery=log)");
 			return;
 		}
 		JavaMailSender mail = this.sender.getIfAvailable();

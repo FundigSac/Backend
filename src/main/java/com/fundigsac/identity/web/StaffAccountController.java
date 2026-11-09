@@ -70,6 +70,7 @@ class StaffAccountController {
 	}
 
 	@PostMapping("/verification-email")
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@Operation(summary = "Reenviar enlace de verificación", description = "Solo clientes pendientes de verificar.")
 	ResponseEntity<Map<String, String>> resendVerification(@PathVariable UUID id) {
 		this.administration.resendVerification(id);
@@ -77,6 +78,7 @@ class StaffAccountController {
 	}
 
 	@PostMapping("/password-reset")
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@Operation(summary = "Enviar enlace para definir contraseña", description = "Solo clientes: el personal entra con código.")
 	ResponseEntity<Map<String, String>> passwordReset(@PathVariable UUID id) {
 		this.administration.sendPasswordReset(id);

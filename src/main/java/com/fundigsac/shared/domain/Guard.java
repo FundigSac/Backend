@@ -67,6 +67,13 @@ public final class Guard {
 		return values;
 	}
 
+	/** PostgreSQL no admite U+0000 en un texto: se rechaza como dato no válido antes de llegar a la base de datos. */
+	public static void noNullCharacter(String field, @Nullable String value) {
+		if (value != null && value.indexOf('\u0000') >= 0) {
+			throw new ValidationException(field, "INVALID_CHARACTER", "El valor contiene caracteres no permitidos.");
+		}
+	}
+
 	static String singleLine(@Nullable String value) {
 		if (value == null) {
 			return "";

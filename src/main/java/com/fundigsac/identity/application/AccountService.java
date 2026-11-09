@@ -7,6 +7,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fundigsac.identity.domain.GoogleIdTokenVerifier;
 import com.fundigsac.identity.domain.PasswordHasher;
 import com.fundigsac.identity.domain.PasswordPolicy;
 import com.fundigsac.identity.domain.RefreshTokenRepository;
@@ -33,6 +34,8 @@ public class AccountService {
 
 	private final PasswordHasher hasher;
 
+	private final GoogleIdTokenVerifier google;
+
 	private final CurrentActor actor;
 
 	private final DomainEvents events;
@@ -40,10 +43,11 @@ public class AccountService {
 	private final Clock clock;
 
 	AccountService(UserAccountRepository accounts, RefreshTokenRepository refreshTokens, PasswordHasher hasher,
-			CurrentActor actor, DomainEvents events, Clock clock) {
+			GoogleIdTokenVerifier google, CurrentActor actor, DomainEvents events, Clock clock) {
 		this.accounts = accounts;
 		this.refreshTokens = refreshTokens;
 		this.hasher = hasher;
+		this.google = google;
 		this.actor = actor;
 		this.events = events;
 		this.clock = clock;
@@ -63,12 +67,15 @@ public class AccountService {
 		return AccountView.of(this.accounts.findById(account.id()).orElseThrow());
 	}
 
-	/** Cambia la contraseña y cierra todas las sesiones (también invalida los JWT emitidos por el sello). */
+	/**
+	 * Cambia la contraseña y cierra todas las sesiones (también invalida los JWT emitidos por el sello). Una cuenta solo
+	 * Google define aquí su primera contraseña confirmando su identidad con un ID token de Google reciente.
+	 */
 	@Transactional
-	public void changePassword(String currentPassword, String newPassword) {
+	public void changePassword(@Nullable String currentPassword, String newPassword, @Nullable String googleIdToken) {
 		Instant now = this.clock.instant();
 		UserAccount account = current();
-		requirePassword(account, currentPassword, "currentPassword");
+		confirmIdentity(account, currentPassword, "currentPassword", googleIdToken);
 		PasswordPolicy.check("newPassword", newPassword, account.email().value());
 		account.changePassword(this.hasher.hash(newPassword), now);
 		this.accounts.update(account);
@@ -76,21 +83,39 @@ public class AccountService {
 		this.events.publishFrom(account);
 	}
 
-	/** Eliminación de la cuenta a pedido del titular (confirmada con su contraseña). */
+	/** Eliminación de la cuenta a pedido del titular (confirmada con su contraseña o, si no tiene, con Google). */
 	@Transactional
-	public void deleteAccount(String password) {
+	public void deleteAccount(@Nullable String password, @Nullable String googleIdToken) {
 		Instant now = this.clock.instant();
 		UserAccount account = current();
-		requirePassword(account, password, "password");
+		confirmIdentity(account, password, "password", googleIdToken);
 		account.delete(now);
 		this.accounts.update(account);
 		this.refreshTokens.revokeAllForUser(account.id(), now);
 		this.events.publishFrom(account);
 	}
 
-	private void requirePassword(UserAccount account, String password, String field) {
-		if (!this.hasher.matches(password, account.passwordHash())) {
-			throw new ValidationException(field, "WRONG_PASSWORD", "La contraseña actual no es correcta.");
+	/**
+	 * Confirma que quien opera es el titular. Una cuenta creada con Google no tiene contraseña, así que la prueba es un ID
+	 * token de Google del mismo sujeto vinculado a la cuenta; sin esto no podría ejercer su derecho de supresión.
+	 */
+	private void confirmIdentity(UserAccount account, @Nullable String password, String field,
+			@Nullable String googleIdToken) {
+		if (account.hasPassword()) {
+			if (password == null || password.isBlank()) {
+				throw new ValidationException(field, "REQUIRED", "Ingrese su contraseña.");
+			}
+			if (!this.hasher.matches(password, account.passwordHash())) {
+				throw new ValidationException(field, "WRONG_PASSWORD", "La contraseña actual no es correcta.");
+			}
+			return;
+		}
+		String linked = account.signup().googleSubject();
+		boolean confirmed = linked != null && googleIdToken != null && !googleIdToken.isBlank()
+				&& this.google.verify(googleIdToken).filter((identity) -> linked.equals(identity.subject())).isPresent();
+		if (!confirmed) {
+			throw new ValidationException("googleIdToken", "GOOGLE_REAUTH_REQUIRED",
+					"Confirme su identidad volviendo a ingresar con Google.");
 		}
 	}
 

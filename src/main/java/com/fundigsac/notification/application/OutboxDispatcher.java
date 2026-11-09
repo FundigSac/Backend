@@ -54,7 +54,7 @@ class OutboxDispatcher {
 						this.properties.retryBase(), this.clock.instant());
 				if (email.status() == OutgoingEmail.Status.FAILED) {
 					log.error("Correo {} ({}) falló tras {} intentos: {}", email.id(), email.template(), email.attempts(),
-							email.lastError());
+							ex.getClass().getSimpleName());
 				}
 				else {
 					log.warn("Correo {} ({}) falló (intento {}); se reintentará.", email.id(), email.template(), email.attempts());

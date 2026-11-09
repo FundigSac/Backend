@@ -24,6 +24,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.quotation.api.QuoteSubmission;
 import com.fundigsac.quotation.application.QuoteQueryService;
@@ -113,6 +115,7 @@ class QuoteController {
 
 	@PostMapping
 	@RateLimited("public-form")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Solicitar cotización", description = """
 			Registra la solicitud y devuelve folio y token de constancia. Envíe `Idempotency-Key` para que un reintento \
 			devuelva el mismo folio. Con sesión de cliente, la solicitud queda vinculada a su cuenta.""")

@@ -39,6 +39,7 @@ class StaffCodeLoginIT extends IntegrationTest {
 		this.mvc.perform(postJson("/api/v1/auth/staff/code/verify", Map.of("email", "nadie@fundigsac.test", "code", "123456")))
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.code").value("INVALID_CODE"));
+		awaitEventsProcessed();
 		assertThat(codesSentTo("nadie@fundigsac.test")).isZero();
 		assertThat(codesSentTo("cliente.codigo@empresa.pe")).isZero();
 	}
@@ -76,6 +77,7 @@ class StaffCodeLoginIT extends IntegrationTest {
 
 		// Pedir otro antes de 60 s no emite un código nuevo.
 		this.mvc.perform(postJson("/api/v1/auth/staff/code", Map.of("email", email))).andExpect(status().isAccepted());
+		awaitEventsProcessed();
 		assertThat(codesSentTo(email)).isEqualTo(1);
 
 		for (int i = 0; i < 5; i++) {

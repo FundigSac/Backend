@@ -72,6 +72,34 @@ class QuotationIT extends IntegrationTest {
 	}
 
 	@Test
+	void aQuoteSubmittedWithASessionBelongsToTheCustomer() throws Exception {
+		String email = "cotiza.sesion@empresa.pe";
+		String access = customerToken(email, "frase-de-paso-muy-larga");
+		String folio = body(this.mvc.perform(authed(postJson("/api/v1/quotes", quote("vcp-f4-01", null)), access))
+			.andExpect(status().isCreated())
+			.andReturn()).get("folio").asString();
+
+		assertThat(this.jdbc.sql("SELECT CAST(customer_id AS text) FROM quote_requests WHERE folio = :f").param("f", folio).query(String.class).single())
+			.isEqualTo(userId(email));
+		this.mvc.perform(authed(get("/api/v1/account/quotes").with(randomIp()), access))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].folio").value(folio));
+
+		// Sin sesión la solicitud no se vincula a ninguna cuenta.
+		String anonymous = body(this.mvc.perform(postJson("/api/v1/quotes", quote("vcp-f4-01", null))).andExpect(status().isCreated()).andReturn())
+			.get("folio").asString();
+		assertThat(count("SELECT count(*) FROM quote_requests WHERE folio = :f AND customer_id IS NULL", Map.of("f", anonymous))).isEqualTo(1);
+	}
+
+	@Test
+	void theInboxRejectsAnUnknownStatusFilter() throws Exception {
+		this.mvc.perform(authed(get("/api/v1/staff/quotes").param("status", "NOPE").with(randomIp()), adminToken()))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors[0].code").value("INVALID_FILTER"));
+		this.mvc.perform(authed(get("/api/v1/staff/quotes").param("status", "received").with(randomIp()), adminToken())).andExpect(status().isOk());
+	}
+
+	@Test
 	void idempotencyKeyReturnsSameFolioAndRejectsDifferentPayload() throws Exception {
 		Map<String, Object> body = quote("vcp-f4-01", null);
 		String first = body(this.mvc.perform(postJson("/api/v1/quotes", body).header("Idempotency-Key", "reintento-001-abc"))
@@ -147,6 +175,28 @@ class QuotationIT extends IntegrationTest {
 			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
 		this.mvc.perform(authed(post("/api/v1/staff/quotes/00000000-0000-7000-8000-000000000000/status").with(randomIp()), customer))
 			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void aLineCanDescribeAProductThatIsNotInTheCatalog() throws Exception {
+		Map<String, Object> free = new HashMap<>();
+		free.put("productName", "Válvula especial fuera de catálogo");
+		free.put("quantity", 3);
+		free.put("unit", "und");
+		Map<String, Object> payload = new HashMap<>(quote("vcp-f4-01", null));
+		payload.put("items", List.of(free));
+		String folio = body(this.mvc.perform(postJson("/api/v1/quotes", payload)).andExpect(status().isCreated()).andReturn()).get("folio").asString();
+		assertThat(this.jdbc.sql("""
+				SELECT i.product_name FROM quote_items i JOIN quote_requests q ON q.id = i.quote_id WHERE q.folio = :f AND i.product_id IS NULL""")
+			.param("f", folio)
+			.query(String.class)
+			.single()).isEqualTo("Válvula especial fuera de catálogo");
+
+		free.remove("productName");
+		this.mvc.perform(postJson("/api/v1/quotes", payload))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors[0].field").value("items.productName"))
+			.andExpect(jsonPath("$.errors[0].code").value("REQUIRED"));
 	}
 
 }

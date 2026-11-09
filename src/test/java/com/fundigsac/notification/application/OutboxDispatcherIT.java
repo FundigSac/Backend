@@ -38,8 +38,8 @@ class OutboxDispatcherIT extends IntegrationTest {
 		Awaitility.await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(
 				count("SELECT count(*) FROM email_outbox WHERE reference = :f AND status = 'PENDING'", Map.of("f", folio))).isEqualTo(2));
 
-		// Puede haber correos pendientes de otras pruebas: se despacha por lotes hasta vaciar la bandeja.
-		for (int i = 0; i < 20 && count("SELECT count(*) FROM email_outbox WHERE status = 'PENDING'", Map.of()) > 0; i++) {
+		// La bandeja es compartida con otras pruebas: se despacha por lotes hasta que salgan los correos de esta consulta.
+		for (int i = 0; i < 500 && count("SELECT count(*) FROM email_outbox WHERE reference = :f AND status = 'PENDING'", Map.of("f", folio)) > 0; i++) {
 			this.dispatcher.dispatch();
 		}
 

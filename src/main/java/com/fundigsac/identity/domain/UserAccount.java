@@ -210,9 +210,16 @@ public final class UserAccount extends AggregateRoot {
 		this.updatedAt = now;
 	}
 
-	/** El personal puede pedir un código de acceso si está activo o invitado, y no bloqueado. */
-	public boolean canRequestLoginCode(Instant now) {
-		return this.kind == AccountKind.STAFF && !isLocked(now)
+	public boolean hasPassword() {
+		return this.passwordHash != null;
+	}
+
+	/**
+	 * El personal puede pedir un código de acceso si está activo o invitado. El bloqueo por contraseñas erróneas no se
+	 * aplica aquí: el código tiene sus propios límites y lo contrario permitiría a un anónimo dejar fuera al personal.
+	 */
+	public boolean canRequestLoginCode() {
+		return this.kind == AccountKind.STAFF
 				&& (this.status == AccountStatus.ACTIVE || this.status == AccountStatus.PENDING_VERIFICATION);
 	}
 
@@ -221,7 +228,7 @@ public final class UserAccount extends AggregateRoot {
 	 * activo y verificado con su primer ingreso.
 	 */
 	public void signInWithLoginCode(Instant now) {
-		if (!canRequestLoginCode(now)) {
+		if (!canRequestLoginCode()) {
 			throw new RuleViolationException("LOGIN_CODE_NOT_ALLOWED", "La cuenta no puede ingresar con código.");
 		}
 		if (this.status == AccountStatus.PENDING_VERIFICATION) {

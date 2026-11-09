@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.identity.application.StaffCodeLoginService;
 import com.fundigsac.shared.web.RateLimited;
@@ -45,6 +46,7 @@ class StaffAccessController {
 
 	@PostMapping("/code")
 	@RateLimited("login-code")
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@Operation(summary = "Enviar código de acceso al correo del personal",
 			description = "Responde 202 siempre igual, exista o no la cuenta. El código vence a los 10 minutos y pedir otro exige esperar 60 segundos.")
 	ResponseEntity<CodeResponse> requestCode(@Valid @RequestBody CodeRequest request) {

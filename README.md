@@ -6,7 +6,7 @@ API del sitio de FUNDIGSAC: catálogo técnico, cotizaciones B2B, consultas de c
 privacidad (Ley N.° 29733), cuentas de clientes y panel del personal.
 
 > **Estado:** backend y base de datos completos, probados y **conectados en local** con el sitio (carpeta
-> `../Frontend`) y el gestor de usuarios (`../Gestor de usuarios`), ambos a través de un BFF en Next.js con cookies
+> `../Frontend`) y el panel del personal (`../Admin`), ambos a través de un BFF en Next.js con cookies
 > `HttpOnly`. Sin `BACKEND_URL`, el sitio y el panel siguen funcionando como antes (envío por correo o WhatsApp y
 > datos de demostración). Los datos del catálogo provienen del sitio y quedan marcados como no verificados
 > (`dataVerified = false`) hasta que Ingeniería los valide.
@@ -104,7 +104,7 @@ firmadas que solo viajan a sus rutas `/api`.
 | App | Variables | Arranque |
 |---|---|---|
 | Sitio (`../Frontend`, :3000) | `BACKEND_URL=http://localhost:8080`, `AUTH_SECRET` (y `GOOGLE_CLIENT_ID`/`SECRET` para Google) | `npx next dev --port 3000` |
-| Panel (`../Gestor de usuarios`, :3110) | `NEXT_PUBLIC_DATA_SOURCE=backend`, `BACKEND_URL=http://localhost:8080`, `ADMIN_AUTH_SECRET` | `npx next dev --port 3110` |
+| Panel (`../Admin`, :3110) | `NEXT_PUBLIC_DATA_SOURCE=backend`, `BACKEND_URL=http://localhost:8080`, `ADMIN_AUTH_SECRET` | `npx next dev --port 3110` |
 | API (este repositorio) | `.env` opcional con `GOOGLE_CLIENT_ID` (el mismo del sitio) para el ingreso con Google | `docker compose up -d --build` |
 
 - **Sitio:** registro, verificación por correo, ingreso, recuperación de contraseña, Google, cotizaciones (con folio y
@@ -121,13 +121,22 @@ firmadas que solo viajan a sus rutas `/api`.
 
 | Grupo | Endpoints |
 |---|---|
-| Pública | `catalog/categories`, `catalog/products` (filtros `q`, `category`, `family`, `joint`, `dn`, `pn`, `homologation`, `sector`), `catalog/products/{slug}`, `catalog/filters`, `catalog/sectors`, `resources`, `resources/{slug}/download`, `POST quotes`, `quotes/{folio}/receipt`, `POST complaints`, `complaints/{folio}/receipt`, `POST inquiries`, `legal/{type}`, `POST privacy/consents`, `POST privacy/requests` |
-| Acceso y cuenta | `auth/register`, `verify-email`, `login`, `google`, `staff/code`, `staff/code/verify`, `refresh`, `logout`, `password/forgot`, `password/reset`, `invitation/accept`; `account/me`, `account/password`, `DELETE account`, `account/quotes`; `cart`, `cart/items`, `cart/submit` |
-| Personal | `accounts` (directorio de clientes y personal con filtros y conteos, `stats`, `activity`, ficha, corrección de datos, desactivar, reactivar, reenviar verificación, enlace de contraseña, notas internas, anonimizar); bandejas de `quotes`, `inquiries`, `complaints` y `privacy/requests` (asignar, estados, responder); `catalog/products` y `catalog/documents` (borrador → revisión → publicación); `users` (invitar, roles, desactivar); `legal/{type}/versions`; `audit`; `notifications` |
+| Pública | `catalog/categories`, `catalog/categories/{slug}`, `catalog/products` (filtros `q`, `category`, `family`, `joint`, `dn`, `pn`, `homologation`, `sector`), `catalog/products/{slug}`, `catalog/filters`, `catalog/sectors`, `resources`, `resources/{slug}`, `resources/{slug}/download`, `POST quotes`, `quotes/{folio}/receipt`, `POST complaints`, `complaints/{folio}/receipt`, `POST inquiries`, `legal/{type}`, `legal/{type}/versions`, `POST privacy/consents`, `POST privacy/requests` |
+| Acceso y cuenta | `auth/register`, `verify-email`, `verify-email/resend`, `login`, `google`, `staff/code`, `staff/code/verify`, `refresh`, `logout`, `password/forgot`, `password/reset`, `invitation/accept`; `account/me`, `account/password`, `DELETE account`, `account/quotes`; `cart`, `cart/items`, `cart/submit` |
+| Personal | `accounts` (directorio de clientes y personal con filtros y conteos, `stats`, `activity`, ficha, corrección de datos, desactivar, reactivar, reenviar verificación, enlace de contraseña, notas internas, anonimizar); bandejas de `quotes`, `inquiries`, `complaints` y `privacy/requests` (asignar, estados, responder); `catalog/products` y `catalog/documents` (borrador → revisión → publicación); `users` (invitar, roles, desactivar, reactivar); `profile`; `legal/{type}/versions`; `audit`; `notifications` (reintento) |
 
-Convenciones: errores RFC 9457 (`application/problem+json`) con `code`, `errors[]` y `requestId`; los formularios
-públicos aceptan `Idempotency-Key` (un reintento devuelve el mismo folio); las modificaciones del personal exigen
-`If-Match` con el `ETag` del registro (428 si falta, 412 si cambió); paginación `page`/`size` (máximo 100).
+Convenciones: errores RFC 9457 (`application/problem+json`) con `code`, `errors[]` y `requestId`, documentados en el contrato
+OpenAPI de cada operación (esquema `Problem`); los formularios
+públicos aceptan `Idempotency-Key` (un reintento devuelve el mismo folio); las operaciones del personal que cambian un
+registro versionado exigen `If-Match` con su `ETag` (428 si falta, 412 si cambió); paginación `page`/`size` (máximo 100).
+
+Operaciones del personal sin `If-Match`, porque no sobrescriben un registro versionado: las altas (`POST users`,
+`catalog/products`, `catalog/documents` y `legal/{type}/versions`), la nota interna (`PUT accounts/{id}/notes`, se guarda
+en una tabla aparte y gana la última escritura), el reintento de un correo (`POST notifications/{id}/retry`, protegido por
+su estado: 409 si ya no está fallido) y los envíos de correo (`POST accounts/{id}/verification-email` y `/password-reset`).
+
+Los filtros `family` y `sector` son datos del catálogo: un valor desconocido devuelve una lista vacía. `joint` es una lista
+cerrada: un valor desconocido responde 400. Un parámetro con el carácter U+0000 responde 400 (`INVALID_CHARACTER`).
 
 ## Seguridad
 
@@ -137,9 +146,13 @@ públicos aceptan `Idempotency-Key` (un reintento devuelve el mismo folio); las 
   revoca toda la familia. Los JWT llevan un sello de seguridad que invalida los tokens en segundos al cambiar la
   contraseña, los roles o el estado de la cuenta.
 - **Contraseñas:** Argon2id con los parámetros de OWASP y política NIST (12 a 128 caracteres, rechaza contraseñas
-  comunes o que contengan el correo). Tras 5 intentos fallidos, la cuenta se bloquea 15 minutos.
+  comunes o que contengan el correo). Tras 5 contraseñas erróneas el ingreso con contraseña se bloquea 15 minutos. Ese
+  bloqueo no afecta al acceso del personal con código, y una cuenta sin contraseña no acumula fallos, para que un anónimo
+  no pueda dejar fuera a nadie.
 - **Sin enumeración de cuentas:** registro y recuperación responden siempre igual; el inicio de sesión tarda lo mismo
-  aunque la cuenta no exista.
+  aunque la cuenta no exista o no tenga contraseña.
+- **Cuentas creadas con Google:** no tienen contraseña; confirman `DELETE account` y `POST account/password` con un ID token
+  de Google reciente del mismo sujeto (`googleIdToken`).
 - **Autorización:** RBAC con permisos finos (`quote:manage`, `catalog:publish`…) en cada caso de uso y autorización
   por objeto (una cotización ajena responde 404). La publicación de fichas exige que la revise una persona distinta de
   quien la envió (cuatro ojos).
@@ -179,10 +192,23 @@ búsqueda sin tildes, V15 notas internas):
 ./mvnw verify
 ```
 
-- 37 pruebas unitarias y de arquitectura (reglas de dominio, valores, límites de módulos y capas).
-- 55 pruebas de integración con PostgreSQL 18 real en Testcontainers (requiere Docker): flujos completos, seguridad,
-  idempotencia, concurrencia optimista, eventos, correos, acceso con código y con Google (verificador de prueba, sin
-  Internet), directorio del panel y protecciones de la base de datos.
+- Pruebas unitarias y de arquitectura: reglas de dominio, valores, límites de módulos y capas, sello de seguridad, validación
+  de los ID token de Google, carga de claves JWT y envío de correos.
+- Pruebas de integración con PostgreSQL 18 real en Testcontainers (requiere Docker): flujos completos, permisos de cada
+  operación con cada rol, `If-Match`, límites de frecuencia, peticiones simultáneas, roles de la base de datos y arranque con
+  `application-prod.yml`. Cubren las 97 operaciones y cada respuesta real se compara con el contrato
+  OpenAPI: código de estado documentado, tipo de contenido y esquema del cuerpo.
+- Las fechas de negocio se calculan en hora de Lima: CI ejecuta además la suite con la JVM en UTC+14
+  (`-Duser.timezone=Pacific/Kiritimati`).
+- JaCoCo se ejecuta dentro de `verify` y rompe la compilación por debajo de 95 % de líneas, 95 % de métodos y 80 % de ramas.
+  Informe en `target/site/jacoco/index.html`. Las clases y los métodos se ejecutan en orden aleatorio.
+
+Colección de Postman con los flujos públicos, de acceso, de cuenta y del personal contra el entorno en marcha (no publica
+nada en la nube de Postman):
+
+```bash
+sh postman/run.sh
+```
 
 ## Antes de producción
 

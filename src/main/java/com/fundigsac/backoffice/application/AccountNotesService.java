@@ -13,6 +13,7 @@ import com.fundigsac.identity.api.IdentityEvents.AccountDeleted;
 import com.fundigsac.shared.application.CurrentActor;
 import com.fundigsac.shared.domain.NotFoundException;
 import com.fundigsac.shared.domain.ValidationException;
+import com.fundigsac.shared.domain.Guard;
 import com.fundigsac.shared.security.Authz;
 
 /** Notas internas del personal sobre una cuenta (hasta 2000 caracteres). Se borran al anonimizar la cuenta. */
@@ -39,6 +40,7 @@ public class AccountNotesService {
 	@PreAuthorize(Authz.USERS_MANAGE)
 	@Transactional
 	public AccountRow save(UUID userId, String text) {
+		Guard.noNullCharacter("notes", text);
 		String value = text.strip();
 		if (value.length() > MAX_LENGTH) {
 			throw new ValidationException("notes", "TOO_LONG", "La nota admite hasta 2000 caracteres.");

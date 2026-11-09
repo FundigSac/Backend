@@ -17,6 +17,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.catalog.application.CatalogQueryService;
 import com.fundigsac.catalog.application.CatalogViews.DocumentView;
@@ -134,6 +136,7 @@ class StaffCatalogController {
 	}
 
 	@PostMapping("/products")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Crear borrador")
 	ResponseEntity<ProductDetailView> create(@Valid @RequestBody ProductRequest request) {
 		ProductDetailView view = this.products.create(request.toDraft());
@@ -197,6 +200,7 @@ class StaffCatalogController {
 	}
 
 	@PostMapping("/documents")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Registrar documento (borrador)", description = "Si es descargable, indique URL, tipo, tamaño y SHA-256 del archivo.")
 	ResponseEntity<DocumentView> createDocument(@Valid @RequestBody DocumentRequest request) {
 		DocumentView view = this.documents.create(request.toDraft());

@@ -20,6 +20,7 @@ import jakarta.validation.constraints.Size;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.inquiry.application.InquiryService;
 import com.fundigsac.shared.application.PageQuery;
@@ -65,6 +67,7 @@ class InquiryController {
 	@PostMapping("/api/v1/inquiries")
 	@RateLimited("public-form")
 	@Tag(name = "Contacto", description = "Consultas generales del formulario de contacto")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Enviar consulta", description = "Devuelve el folio CON-AAAA-NNNNNN. Acepta Idempotency-Key.")
 	ResponseEntity<Map<String, Object>> submit(
 			@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,

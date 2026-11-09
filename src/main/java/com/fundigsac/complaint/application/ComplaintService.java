@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fundigsac.complaint.application.ComplaintViews.ComplaintSheet;
 import com.fundigsac.complaint.application.ComplaintViews.ComplaintSummary;
-import com.fundigsac.complaint.application.ComplaintViews.Receipt;
+import com.fundigsac.complaint.application.ComplaintViews.ComplaintReceipt;
 import com.fundigsac.complaint.domain.Complaint;
 import com.fundigsac.complaint.domain.ComplaintRepository;
 import com.fundigsac.complaint.domain.ResponseDeadlinePolicy;
@@ -91,12 +91,12 @@ public class ComplaintService {
 	}
 
 	@Transactional
-	public Receipt file(FileComplaint command, @Nullable String idempotencyKey) {
-		return this.idempotency.execute("complaint", idempotencyKey, command, () -> register(command), Receipt::folio,
+	public ComplaintReceipt file(FileComplaint command, @Nullable String idempotencyKey) {
+		return this.idempotency.execute("complaint", idempotencyKey, command, () -> register(command), ComplaintReceipt::folio,
 				(folio) -> receipt(this.complaints.findByFolio(folio).orElseThrow()));
 	}
 
-	private Receipt register(FileComplaint c) {
+	private ComplaintReceipt register(FileComplaint c) {
 		Instant now = this.clock.instant();
 		Complaint.Consumer consumer = new Complaint.Consumer(c.consumerName(),
 				IdentityDocument.of(parse(IdentityDocument.Type.class, "documentType", c.documentType()), c.documentNumber()),
@@ -210,9 +210,9 @@ public class ComplaintService {
 		return this.complaints.findById(id).orElseThrow(ComplaintService::notFound);
 	}
 
-	private Receipt receipt(Complaint c) {
+	private ComplaintReceipt receipt(Complaint c) {
 		String folio = c.folio().value();
-		return new Receipt(folio, c.kind().name(), c.status().name(), c.filedAt(), c.responseDueOn(),
+		return new ComplaintReceipt(folio, c.kind().name(), c.status().name(), c.filedAt(), c.responseDueOn(),
 				this.receipts.issue(RECEIPT_PURPOSE, folio));
 	}
 

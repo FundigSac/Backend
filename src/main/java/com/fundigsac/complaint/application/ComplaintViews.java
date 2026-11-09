@@ -19,7 +19,7 @@ public final class ComplaintViews {
 	public record AmountView(BigDecimal amount, String currency) {
 	}
 
-	public record HistoryView(String type, @Nullable String note, @Nullable UUID actorId, Instant occurredAt) {
+	public record ComplaintHistoryView(String type, @Nullable String note, @Nullable UUID actorId, Instant occurredAt) {
 	}
 
 	/** Copia de la hoja para el consumidor (constancia) y para Atención Legal. */
@@ -30,7 +30,7 @@ public final class ComplaintViews {
 			@Nullable String relatedReference, String facts, String consumerRequest, String responseChannel,
 			Instant filedAt, LocalDate responseDueOn, boolean overdue, @Nullable String responseText,
 			@Nullable Instant respondedAt, @Nullable Instant closedAt, @Nullable UUID assigneeId,
-			List<HistoryView> history, long version) {
+			List<ComplaintHistoryView> history, long version) {
 
 		static ComplaintSheet of(Complaint c, List<Complaint.Event> events, Instant now, boolean forStaff) {
 			var con = c.consumer();
@@ -47,7 +47,7 @@ public final class ComplaintViews {
 					d.serviceLocation(), d.incidentDate(), d.relatedReference(), d.facts(), d.consumerRequest(),
 					c.responseChannel().name(), c.filedAt(), c.responseDueOn(), c.isOverdue(now), c.responseText(),
 					c.respondedAt(), c.closedAt(), forStaff ? c.assigneeId() : null,
-					forStaff ? events.stream().map((e) -> new HistoryView(e.type().name(), e.note(), e.actorId(), e.occurredAt())).toList()
+					forStaff ? events.stream().map((e) -> new ComplaintHistoryView(e.type().name(), e.note(), e.actorId(), e.occurredAt())).toList()
 							: List.of(),
 					forStaff ? c.version() : 0);
 		}
@@ -58,7 +58,7 @@ public final class ComplaintViews {
 			LocalDate responseDueOn, boolean overdue, @Nullable UUID assigneeId) {
 	}
 
-	public record Receipt(String folio, String kind, String status, Instant filedAt, LocalDate responseDueOn,
+	public record ComplaintReceipt(String folio, String kind, String status, Instant filedAt, LocalDate responseDueOn,
 			String receiptToken) {
 	}
 

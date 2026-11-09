@@ -72,6 +72,12 @@ class QuoteSubmissionService implements QuoteSubmission {
 				(folio) -> receiptOf(this.quotes.findByFolio(folio).orElseThrow()));
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public Receipt receipt(String folio) {
+		return receiptOf(this.quotes.findByFolio(folio).orElseThrow());
+	}
+
 	private Receipt register(Request request) {
 		Instant now = this.clock.instant();
 		QuoteOrigin origin = origin(request.origin());

@@ -1,5 +1,6 @@
 package com.fundigsac.quotation.web;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -28,8 +29,10 @@ import com.fundigsac.quotation.application.QuoteReadModel;
 import com.fundigsac.quotation.application.QuoteViews.QuoteDetailView;
 import com.fundigsac.quotation.application.QuoteViews.QuoteSummaryView;
 import com.fundigsac.quotation.application.StaffQuoteService;
+import com.fundigsac.quotation.domain.QuoteStatus;
 import com.fundigsac.shared.application.PageQuery;
 import com.fundigsac.shared.application.PageResult;
+import com.fundigsac.shared.domain.ValidationException;
 import com.fundigsac.shared.web.ApiDocs;
 import com.fundigsac.shared.web.ETags;
 
@@ -62,6 +65,9 @@ class StaffQuoteController {
 			@RequestParam(required = false) @Size(max = 100) String q, @RequestParam(required = false) @Min(0) Integer page,
 			@RequestParam(required = false) @Min(1) @Max(100) Integer size) {
 		String normalized = status == null || status.isBlank() ? null : status.strip().toUpperCase(Locale.ROOT);
+		if (normalized != null && Arrays.stream(QuoteStatus.values()).noneMatch((known) -> known.name().equals(normalized))) {
+			throw new ValidationException("status", "INVALID_FILTER", "Filtro no válido.");
+		}
 		String query = q == null || q.isBlank() ? null : q.strip();
 		return this.queries.inbox(new QuoteReadModel.StaffFilter(normalized, assigneeId, unassigned, query),
 				PageQuery.of(page, size));

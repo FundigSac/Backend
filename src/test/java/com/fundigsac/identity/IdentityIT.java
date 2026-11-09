@@ -125,8 +125,9 @@ class IdentityIT extends IntegrationTest {
 		this.mvc.perform(authed(get("/api/v1/staff/users").with(randomIp()), sales)).andExpect(status().isForbidden());
 
 		String admin = adminToken();
-		// El listado del personal (con y sin búsqueda) incluye a quien se acaba de invitar.
-		this.mvc.perform(authed(get("/api/v1/staff/users").with(randomIp()), admin))
+		// El listado del personal (con y sin búsqueda) incluye a quien se acaba de invitar. Se pide la página máxima porque
+		// la base de datos es compartida: otras pruebas también invitan personal y la primera página es de 20.
+		this.mvc.perform(authed(get("/api/v1/staff/users").param("size", "100").with(randomIp()), admin))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.items[*].email").value(org.hamcrest.Matchers.hasItem("ventas.prueba@fundigsac.test")));
 		this.mvc.perform(authed(get("/api/v1/staff/users").param("q", "ventas.prueba").with(randomIp()), admin))

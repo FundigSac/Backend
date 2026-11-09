@@ -6,6 +6,8 @@ import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 
+import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
+import org.springdoc.core.customizers.GlobalOperationCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,6 +35,18 @@ class OpenApiConfig {
 			.components(new Components().addSecuritySchemes(BEARER,
 					new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")
 						.description("Token de acceso de POST /api/v1/auth/login (15 minutos).")));
+	}
+
+	/** Esquema RFC 9457 de los errores, referido por todas las operaciones. */
+	@Bean
+	GlobalOpenApiCustomizer problemSchemaCustomizer() {
+		return (openApi) -> openApi.getComponents().addSchemas(ProblemResponses.SCHEMA_NAME, ProblemResponses.problemSchema());
+	}
+
+	/** Errores documentados de cada operación. */
+	@Bean
+	GlobalOperationCustomizer problemResponsesCustomizer() {
+		return ProblemResponses::document;
 	}
 
 	@Bean

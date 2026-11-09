@@ -17,13 +17,17 @@ class WebConfig implements WebMvcConfigurer {
 
 	private final RateLimitInterceptor rateLimitInterceptor;
 
-	WebConfig(RateLimitInterceptor rateLimitInterceptor) {
+	private final RequestParameterGuard requestParameterGuard;
+
+	WebConfig(RateLimitInterceptor rateLimitInterceptor, RequestParameterGuard requestParameterGuard) {
 		this.rateLimitInterceptor = rateLimitInterceptor;
+		this.requestParameterGuard = requestParameterGuard;
 	}
 
 	@Override
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(this.rateLimitInterceptor).addPathPatterns("/api/**");
+		registry.addInterceptor(this.requestParameterGuard).addPathPatterns("/api/**");
 	}
 
 	@Bean

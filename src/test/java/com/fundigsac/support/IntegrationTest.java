@@ -23,8 +23,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Base de las pruebas de integración: aplicación completa + PostgreSQL 18 en Testcontainers + MockMvc. Cada petición
@@ -33,7 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({ TestcontainersConfiguration.class, FakeGoogleConfiguration.class })
+@Import({ TestcontainersConfiguration.class, FakeGoogleConfiguration.class, OpenApiContractConfiguration.class })
 public abstract class IntegrationTest {
 
 	public static final String ADMIN_EMAIL = "admin@fundigsac.test";
@@ -64,6 +68,32 @@ public abstract class IntegrationTest {
 
 	protected MockHttpServletRequestBuilder postJson(String url, Object body) {
 		return post(url).with(randomIp()).contentType(MediaType.APPLICATION_JSON).content(this.json.writeValueAsString(body));
+	}
+
+	protected MockHttpServletRequestBuilder putJson(String url, Object body) {
+		return put(url).with(randomIp()).contentType(MediaType.APPLICATION_JSON).content(this.json.writeValueAsString(body));
+	}
+
+	protected MockHttpServletRequestBuilder patchJson(String url, Object body) {
+		return patch(url).with(randomIp()).contentType(MediaType.APPLICATION_JSON).content(this.json.writeValueAsString(body));
+	}
+
+	/** GET autenticado con IP aleatoria. */
+	protected MockHttpServletRequestBuilder getAs(String url, String token) {
+		return authed(get(url).with(randomIp()), token);
+	}
+
+	/** Identificador de la cuenta con ese correo. */
+	protected String userId(String email) {
+		return this.jdbc.sql("SELECT CAST(id AS text) FROM user_accounts WHERE email = :e").param("e", email).query(String.class).single();
+	}
+
+	/** ETag vigente del recurso (cabecera del GET de detalle). */
+	protected String etagOf(String url, String token) throws Exception {
+		MvcResult result = this.mvc.perform(getAs(url, token)).andExpect(status().isOk()).andReturn();
+		String etag = result.getResponse().getHeader(HttpHeaders.ETAG);
+		assertThat(etag).as("ETag de %s", url).isNotBlank();
+		return etag;
 	}
 
 	protected MockHttpServletRequestBuilder authed(MockHttpServletRequestBuilder builder, String token) {
@@ -131,9 +161,9 @@ public abstract class IntegrationTest {
 		register.put("phone", "+51 987 654 321");
 		register.put("privacyNoticeVersion", "2026-10");
 		register.put("acceptPrivacyNotice", true);
-		this.mvc.perform(postJson("/api/v1/auth/register", register)).andReturn();
+		this.mvc.perform(postJson("/api/v1/auth/register", register)).andExpect(status().isAccepted());
 		String token = tokenFromOutbox("VERIFY_EMAIL", email);
-		this.mvc.perform(postJson("/api/v1/auth/verify-email", Map.of("token", token))).andReturn();
+		this.mvc.perform(postJson("/api/v1/auth/verify-email", Map.of("token", token))).andExpect(status().isNoContent());
 		return login(email, password);
 	}
 
@@ -141,9 +171,9 @@ public abstract class IntegrationTest {
 	protected String staffToken(String email, String... roles) throws Exception {
 		this.mvc.perform(authed(postJson("/api/v1/staff/users",
 				Map.of("email", email, "fullName", "Personal de Prueba", "roles", java.util.List.of(roles))), adminToken()))
-			.andReturn();
+			.andExpect(status().isCreated());
 		tokenFromOutboxBody("STAFF_INVITATION", email, Pattern.compile("(/login)"));
-		this.mvc.perform(postJson("/api/v1/auth/staff/code", Map.of("email", email))).andReturn();
+		this.mvc.perform(postJson("/api/v1/auth/staff/code", Map.of("email", email))).andExpect(status().isAccepted());
 		String code = loginCodeFromOutbox(email);
 		MvcResult result = this.mvc.perform(postJson("/api/v1/auth/staff/code/verify", Map.of("email", email, "code", code)))
 			.andReturn();
@@ -151,6 +181,16 @@ public abstract class IntegrationTest {
 			throw new IllegalStateException("Ingreso con código falló: " + result.getResponse().getContentAsString());
 		}
 		return body(result).get("accessToken").asString();
+	}
+
+	/**
+	 * Espera a que terminen los oyentes asíncronos de eventos. El registro de publicaciones se borra al completarse, así
+	 * que una tabla sin filas pendientes es una barrera determinista para afirmar que algo NO ocurrió.
+	 */
+	protected void awaitEventsProcessed() {
+		Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(
+				count("SELECT count(*) FROM event_publication WHERE completion_date IS NULL AND status IS DISTINCT FROM 'FAILED'", Map.of()))
+			.isZero());
 	}
 
 	/** Código de 6 dígitos del último correo de acceso enviado al personal. */

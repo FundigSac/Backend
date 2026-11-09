@@ -24,6 +24,7 @@ import com.fundigsac.identity.application.GoogleSignInService;
 import com.fundigsac.identity.application.PasswordResetService;
 import com.fundigsac.identity.application.RegistrationService;
 import com.fundigsac.shared.web.RateLimited;
+import com.fundigsac.shared.web.ApiProblems;
 
 /** Acceso: registro, verificación, ingreso, renovación, salida, recuperación de contraseña e invitaciones. */
 @RestController
@@ -132,6 +133,7 @@ class AuthController {
 
 	@PostMapping("/register")
 	@RateLimited("register")
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@Operation(summary = "Registrar cuenta de cliente", description = "Responde 202 siempre igual (no revela si el correo ya existía) y envía el enlace de verificación.")
 	ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
 		this.registration.register(new RegistrationService.RegisterCustomer(request.email(), request.password(),
@@ -143,6 +145,7 @@ class AuthController {
 	@PostMapping("/verify-email")
 	@RateLimited("token")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@ApiProblems({ 409 })
 	@Operation(summary = "Confirmar correo con el token del enlace")
 	void verifyEmail(@Valid @RequestBody TokenRequest request) {
 		this.registration.verifyEmail(request.token());
@@ -150,6 +153,7 @@ class AuthController {
 
 	@PostMapping("/verify-email/resend")
 	@RateLimited("password-reset")
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@Operation(summary = "Reenviar enlace de verificación")
 	ResponseEntity<Map<String, String>> resendVerification(@Valid @RequestBody EmailRequest request) {
 		this.registration.resendVerification(request.email());
@@ -158,6 +162,7 @@ class AuthController {
 
 	@PostMapping("/login")
 	@RateLimited("login")
+	@ApiProblems({ 403 })
 	@Operation(summary = "Iniciar sesión", description = "Devuelve un JWT de acceso (15 min) y un refresh token rotativo. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.")
 	TokenResponse login(@Valid @RequestBody LoginRequest request) {
 		return TokenResponse.of(this.authentication.login(request.email(), request.password()));
@@ -165,6 +170,7 @@ class AuthController {
 
 	@PostMapping("/google")
 	@RateLimited("login")
+	@ApiProblems({ 403, 422 })
 	@Operation(summary = "Ingresar con Google", description = "Recibe el ID token que obtuvo el frontend con OAuth 2.0 + PKCE y lo valida con las claves de Google. El primer ingreso crea la cuenta de cliente y exige privacyNoticeVersion.")
 	TokenResponse google(@Valid @RequestBody GoogleRequest request) {
 		return TokenResponse.of(this.google.signIn(new GoogleSignInService.GoogleSignIn(request.idToken(),
@@ -187,6 +193,7 @@ class AuthController {
 
 	@PostMapping("/password/forgot")
 	@RateLimited("password-reset")
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	@Operation(summary = "Solicitar enlace de recuperación", description = "Responde 202 siempre igual.")
 	ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody EmailRequest request) {
 		this.passwords.requestReset(request.email());
@@ -204,7 +211,8 @@ class AuthController {
 	@PostMapping("/invitation/accept")
 	@RateLimited("token")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	@Operation(summary = "Aceptar invitación del personal y definir contraseña")
+	@ApiProblems({ 409 })
+	@Operation(summary = "Aceptar invitación del personal y definir contraseña", deprecated = true, description = "Sin uso en el flujo actual: el correo de invitación no entrega este token porque el personal entra con un código de un solo uso.")
 	void acceptInvitation(@Valid @RequestBody NewPasswordRequest request) {
 		this.passwords.acceptInvitation(request.token(), request.password());
 	}

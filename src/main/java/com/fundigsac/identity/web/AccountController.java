@@ -36,8 +36,9 @@ class AccountController {
 			@Size(max = 11) String ruc, @Size(max = 24) String phone) {
 	}
 
-	record ChangePasswordRequest(@NotBlank @Size(max = 128) String currentPassword,
-			@NotBlank @Size(min = 12, max = 128, message = "La contraseña debe tener entre 12 y 128 caracteres.") String newPassword) {
+	record ChangePasswordRequest(@Size(max = 128) String currentPassword,
+			@NotBlank @Size(min = 12, max = 128, message = "La contraseña debe tener entre 12 y 128 caracteres.") String newPassword,
+			@Size(max = 4096) String googleIdToken) {
 
 		@Override
 		public String toString() {
@@ -46,7 +47,7 @@ class AccountController {
 
 	}
 
-	record DeleteAccountRequest(@NotBlank @Size(max = 128) String password) {
+	record DeleteAccountRequest(@Size(max = 128) String password, @Size(max = 4096) String googleIdToken) {
 
 		@Override
 		public String toString() {
@@ -77,17 +78,17 @@ class AccountController {
 	@PostMapping("/password")
 	@RateLimited("login")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	@Operation(summary = "Cambiar mi contraseña", description = "Cierra todas las sesiones; vuelva a iniciar sesión.")
+	@Operation(summary = "Cambiar mi contraseña", description = "Cierra todas las sesiones; vuelva a iniciar sesión. Una cuenta creada con Google no tiene contraseña actual: envía googleIdToken en lugar de currentPassword.")
 	void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-		this.accounts.changePassword(request.currentPassword(), request.newPassword());
+		this.accounts.changePassword(request.currentPassword(), request.newPassword(), request.googleIdToken());
 	}
 
 	@DeleteMapping
 	@RateLimited("login")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	@Operation(summary = "Eliminar mi cuenta", description = "Anonimiza los datos de la cuenta (Ley 29733). Las solicitudes y reclamaciones presentadas se conservan por obligación legal.")
+	@Operation(summary = "Eliminar mi cuenta", description = "Anonimiza los datos de la cuenta (Ley 29733). Se confirma con password o, en una cuenta creada con Google, con googleIdToken. Las solicitudes y reclamaciones presentadas se conservan por obligación legal.")
 	void delete(@Valid @RequestBody DeleteAccountRequest request) {
-		this.accounts.deleteAccount(request.password());
+		this.accounts.deleteAccount(request.password(), request.googleIdToken());
 	}
 
 }

@@ -35,4 +35,4 @@ fi
 
 echo
 echo "Administrador inicial: admin@fundigsac.local"
-echo "Contraseña:            $(cat "$dir/bootstrap_admin_password")"
+echo "Contraseña:            en $dir/bootstrap_admin_password (no se imprime)"

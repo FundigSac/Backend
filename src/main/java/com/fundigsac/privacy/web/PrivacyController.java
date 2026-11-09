@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.privacy.application.PrivacyService;
 import com.fundigsac.shared.application.PageQuery;
@@ -93,6 +94,7 @@ class PrivacyController {
 	@PostMapping("/api/v1/staff/legal/{type}/versions")
 	@SecurityRequirement(name = ApiDocs.BEARER)
 	@Tag(name = "Personal: legal y privacidad", description = "Publicación de textos legales y solicitudes de derechos")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Publicar nueva versión de un texto legal", description = "Inmutable: no se edita, se publica otra versión.")
 	ResponseEntity<PrivacyService.NoticeView> publish(@PathVariable @Size(max = 30) String type,
 			@Valid @RequestBody PublishNoticeRequest r) {
@@ -104,6 +106,7 @@ class PrivacyController {
 	@PostMapping("/api/v1/privacy/consents")
 	@RateLimited("consent")
 	@Tag(name = "Privacidad", description = "Consentimiento de cookies y derechos del titular")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Registrar decisión de cookies", description = "choices debe tener exactamente necessary (true) y thirdParty. No guarda IP ni identificadores de seguimiento.")
 	ResponseEntity<PrivacyService.ConsentReceipt> consent(@Valid @RequestBody ConsentRequest r) {
 		var receipt = this.privacy.recordConsent(r.consentId(), r.choices(), r.policyVersion(), r.source());
@@ -113,6 +116,7 @@ class PrivacyController {
 	@PostMapping("/api/v1/privacy/requests")
 	@RateLimited("public-form")
 	@Tag(name = "Privacidad")
+	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Solicitar un derecho del titular (ARCO) o la eliminación de datos", description = "Devuelve el folio ARC-AAAA-NNNNNN. Acepta Idempotency-Key.")
 	ResponseEntity<PrivacyService.RequestReceipt> request(
 			@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,

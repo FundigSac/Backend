@@ -10,11 +10,14 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.identity.application.AccountView;
 import com.fundigsac.identity.application.StaffUserService;
@@ -62,7 +66,7 @@ class StaffUserController {
 	@GetMapping("/users")
 	@Operation(summary = "Listar personal")
 	PageResult<AccountView> list(@RequestParam(required = false) @Size(max = 100) String q,
-			@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+			@RequestParam(required = false) @Min(0) Integer page, @RequestParam(required = false) @Min(1) @Max(100) Integer size) {
 		return this.users.list(q, PageQuery.of(page, size));
 	}
 
@@ -74,7 +78,8 @@ class StaffUserController {
 	}
 
 	@PostMapping("/users")
-	@Operation(summary = "Invitar a un miembro del personal", description = "Envía un enlace de 72 horas para definir su contraseña.")
+	@ResponseStatus(HttpStatus.CREATED)
+	@Operation(summary = "Invitar a un miembro del personal", description = "Envía un correo con el enlace al acceso del panel, donde la persona entra con un código de un solo uso. El correo no incluye un token para definir contraseña.")
 	ResponseEntity<AccountView> invite(@Valid @RequestBody InviteRequest request) {
 		AccountView view = this.users.invite(request.email(), request.fullName(), EnumSet.copyOf(request.roles()));
 		return ResponseEntity.created(URI.create("/api/v1/staff/users/" + view.id())).eTag(ETags.of(view.version())).body(view);

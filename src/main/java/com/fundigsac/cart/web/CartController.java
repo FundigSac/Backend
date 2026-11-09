@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,11 +26,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.cart.application.CartService;
 import com.fundigsac.quotation.api.QuoteSubmission;
 import com.fundigsac.shared.web.ApiDocs;
 import com.fundigsac.shared.web.RateLimited;
+import com.fundigsac.shared.web.ApiProblems;
 
 /** Carrito de cotización del cliente autenticado. */
 @RestController
@@ -67,6 +70,7 @@ class CartController {
 	}
 
 	@PostMapping("/items")
+	@ApiProblems({ 422 })
 	@Operation(summary = "Agregar producto", description = "Si la pieza y medida ya están, suma la cantidad (máximo 999).")
 	CartService.CartView add(@Valid @RequestBody AddItemRequest request) {
 		return this.cart.add(request.productSlug(), request.variantLabel(), request.quantity(), request.note());
@@ -92,6 +96,8 @@ class CartController {
 
 	@PostMapping("/submit")
 	@RateLimited("public-form")
+	@ResponseStatus(HttpStatus.CREATED)
+	@ApiProblems({ 422 })
 	@Operation(summary = "Enviar a cotizar", description = "Crea la solicitud COT con los productos del carrito y lo vacía. Acepta Idempotency-Key.")
 	ResponseEntity<QuoteSubmission.Receipt> submit(@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 			@Valid @RequestBody CheckoutRequest r) {

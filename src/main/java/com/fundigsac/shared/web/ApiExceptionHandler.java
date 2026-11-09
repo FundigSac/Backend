@@ -1,6 +1,7 @@
 package com.fundigsac.shared.web;
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -119,6 +120,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	ResponseEntity<Object> integrity(DataIntegrityViolationException ex, WebRequest request) {
 		log.warn("Violación de integridad: {}", ex.getMostSpecificCause().getClass().getSimpleName());
+		if (isInvalidData(ex)) {
+			return problem(HttpStatus.BAD_REQUEST, "INVALID_VALUE", "Revise los valores enviados.", List.of(), request);
+		}
 		return problem(HttpStatus.CONFLICT, "CONFLICT", "El registro entra en conflicto con otro existente.", List.of(),
 				request);
 	}
@@ -151,7 +155,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			.stream()
 			.flatMap((result) -> result.getResolvableErrors()
 				.stream()
-				.map((error) -> new FieldProblem(result.getMethodParameter().getParameterName(),
+				.map((error) -> new FieldProblem(error instanceof FieldError field ? field.getField() : result.getMethodParameter().getParameterName(),
 						codeOf(error.getCodes() == null || error.getCodes().length == 0 ? null
 								: error.getCodes()[error.getCodes().length - 1]),
 						message(error.getDefaultMessage()))))
@@ -195,6 +199,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			enrich(detail);
 		}
 		return super.createResponseEntity(body, headers, statusCode, request);
+	}
+
+	/** Clase SQLSTATE 22 (dato no válido): el problema es el valor recibido, no un conflicto con otro registro. */
+	private static boolean isInvalidData(DataIntegrityViolationException ex) {
+		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			if (cause instanceof SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("22")) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private ResponseEntity<Object> domain(HttpStatus status, DomainException ex, WebRequest request) {

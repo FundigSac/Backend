@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import com.fundigsac.support.IntegrationTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,10 +42,28 @@ class PrivacyIT extends IntegrationTest {
 
 	@Test
 	void recordsConsentEvidenceWithoutTrackingData() throws Exception {
-		this.mvc.perform(postJson("/api/v1/privacy/consents", Map.of("choices", Map.of("necessary", true, "thirdParty", false),
-				"policyVersion", "2026-10", "source", "BANNER")))
+		String consentId = body(this.mvc.perform(postJson("/api/v1/privacy/consents", Map.of("choices", Map.of("necessary", true, "thirdParty", false),
+				"policyVersion", "2026-10", "source", "BANNER"))
+			.with((request) -> {
+				request.setRemoteAddr("203.0.113.99");
+				return request;
+			})
+			.header("User-Agent", "NavegadorRastreable/1.0")
+			.header("Cookie", "visitante=identificador-de-seguimiento"))
 			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.consentId").exists());
+			.andExpect(jsonPath("$.consentId").exists())
+			.andReturn()).get("consentId").asString();
+
+		// Ni la tabla tiene columnas de rastreo ni la fila guardada conserva nada de la petición que identifique al visitante.
+		String stored = this.jdbc.sql("SELECT CAST(row_to_json(c) AS text) FROM consent_records c WHERE consent_id = CAST(:id AS uuid)")
+			.param("id", consentId)
+			.query(String.class)
+			.single();
+		assertThat(stored).doesNotContain("203.0.113.99", "NavegadorRastreable", "identificador-de-seguimiento");
+		assertThat(this.jdbc.sql("SELECT column_name FROM information_schema.columns WHERE table_name = 'consent_records'").query(String.class).list())
+			.isNotEmpty()
+			.noneMatch((column) -> column.contains("ip_") || column.contains("agent") || column.contains("cookie") || column.contains("fingerprint"));
+
 		this.mvc.perform(postJson("/api/v1/privacy/consents", Map.of("choices", Map.of("necessary", false, "thirdParty", true),
 				"policyVersion", "2026-10", "source", "BANNER")))
 			.andExpect(status().isBadRequest());

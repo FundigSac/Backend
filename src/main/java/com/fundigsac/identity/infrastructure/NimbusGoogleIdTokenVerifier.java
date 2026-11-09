@@ -8,6 +8,7 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -35,18 +36,21 @@ class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
 
 	private static final Set<String> ISSUERS = Set.of("https://accounts.google.com", "accounts.google.com");
 
-	private final @Nullable String clientId;
-
 	private final @Nullable JwtDecoder decoder;
 
+	@Autowired
 	NimbusGoogleIdTokenVerifier(IdentityProperties properties) {
 		String configured = properties.google().clientId();
-		this.clientId = configured == null || configured.isBlank() ? null : configured.strip();
-		this.decoder = this.clientId == null ? null : decoder(this.clientId);
+		String client = configured == null || configured.isBlank() ? null : configured.strip();
+		this.decoder = client == null ? null : withClaimValidation(NimbusJwtDecoder.withJwkSetUri(JWKS).build(), client);
 	}
 
-	private static JwtDecoder decoder(String clientId) {
-		NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(JWKS).build();
+	/** Las mismas validaciones con otro origen de claves: permite probarlas sin depender de Google. */
+	NimbusGoogleIdTokenVerifier(NimbusJwtDecoder decoder, String clientId) {
+		this.decoder = withClaimValidation(decoder, clientId);
+	}
+
+	private static JwtDecoder withClaimValidation(NimbusJwtDecoder decoder, String clientId) {
 		OAuth2TokenValidator<Jwt> issuer = (jwt) -> ISSUERS.contains(String.valueOf(jwt.getClaims().get("iss")))
 				? OAuth2TokenValidatorResult.success() : failure("Emisor no válido");
 		OAuth2TokenValidator<Jwt> audience = (jwt) -> jwt.getAudience() != null && jwt.getAudience().contains(clientId)

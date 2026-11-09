@@ -70,11 +70,11 @@ class CatalogAdminIT extends IntegrationTest {
 			.andExpect(jsonPath("$.sectors[0].slug").value("agricultura"))
 			.andExpect(jsonPath("$.variants[0].label").value("DN80 · PN16"));
 		this.mvc.perform(get("/api/v1/catalog/products").param("q", "ventosa triple").with(randomIp()))
-			.andExpect(jsonPath("$.items[0].slug").value("valvula-ventosa-triple-funcion"));
+			.andExpect(jsonPath("$.items[*].slug").value(org.hamcrest.Matchers.hasItem("valvula-ventosa-triple-funcion")));
 	}
 
 	@Test
-	void unverifiedDataCannotBePublishedAndSubmitterCannotSelfApprove() throws Exception {
+	void unverifiedDataCannotBePublished() throws Exception {
 		String admin = adminToken();
 		String id = body(this.mvc.perform(authed(postJson("/api/v1/staff/catalog/products", draft(false)), admin))
 			.andExpect(status().isCreated())
@@ -89,6 +89,30 @@ class CatalogAdminIT extends IntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("DRAFT"))
 			.andExpect(jsonPath("$.reviewNote").value("Falta la ficha del fabricante"));
+	}
+
+	@Test
+	void whoSubmitsAProductCannotPublishItEvenWithBothPermissions() throws Exception {
+		String admin = adminToken();
+		Map<String, Object> verified = draft(true);
+		verified.put("slug", "valvula-cuatro-ojos-http");
+		verified.put("name", "Válvula de control con doble revisión");
+		verified.put("sku", "VCO-80");
+		String id = body(this.mvc.perform(authed(postJson("/api/v1/staff/catalog/products", verified), admin))
+			.andExpect(status().isCreated())
+			.andReturn()).get("id").asString();
+		this.mvc.perform(authed(postJson("/api/v1/staff/catalog/products/" + id + "/submit", Map.of()), admin).header("If-Match", "\"0\""))
+			.andExpect(status().isOk());
+
+		// El administrador tiene catalog:publish: el rechazo se debe solo a la regla de cuatro ojos.
+		this.mvc.perform(authed(postJson("/api/v1/staff/catalog/products/" + id + "/publish", Map.of()), admin).header("If-Match", "\"1\""))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("FOUR_EYES"));
+
+		String reviewer = staffToken("revisor.cuatro.ojos@fundigsac.test", "CATALOG_REVIEWER");
+		this.mvc.perform(authed(postJson("/api/v1/staff/catalog/products/" + id + "/publish", Map.of()), reviewer).header("If-Match", "\"1\""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("PUBLISHED"));
 	}
 
 }

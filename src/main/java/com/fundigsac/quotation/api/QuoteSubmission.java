@@ -37,4 +37,7 @@ public interface QuoteSubmission {
 
 	Receipt submit(Request request, @Nullable String idempotencyKey);
 
+	/** Constancia de una solicitud ya registrada (para responder a un reintento con el mismo folio). */
+	Receipt receipt(String folio);
+
 }

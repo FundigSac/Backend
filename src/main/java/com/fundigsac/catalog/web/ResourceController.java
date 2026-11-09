@@ -1,5 +1,6 @@
 package com.fundigsac.catalog.web;
 
+import com.fundigsac.shared.web.ApiProblems;
 import java.net.URI;
 import java.time.Duration;
 
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.fundigsac.catalog.application.CatalogQueryService;
 import com.fundigsac.catalog.application.CatalogViews.DocumentView;
@@ -60,6 +62,8 @@ class ResourceController {
 	}
 
 	@GetMapping("/{slug}/download")
+	@ResponseStatus(HttpStatus.FOUND)
+	@ApiProblems({ 409 })
 	@Operation(summary = "Descargar la versión vigente", description = "Redirige (302) al archivo publicado e informa su SHA-256 para verificar la integridad. 409 si el documento es bajo solicitud.")
 	ResponseEntity<Void> download(@PathVariable @Size(max = 120) String slug) {
 		DocumentView document = this.catalog.downloadable(slug);

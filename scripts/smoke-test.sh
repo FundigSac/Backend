@@ -9,12 +9,16 @@ M="${2:-http://localhost:8025}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 J="Content-Type: application/json"
 FAILED=0
+# Una IP distinta por corrida: los límites son por IP (5 cada 10 minutos en formularios) y así la prueba se puede repetir
+# seguida. La API confía en X-Forwarded-For solo desde redes internas (Docker).
+NOW=$(date +%s)
+CLIENT_IP="198.18.$(( (NOW / 256) % 256 )).$(( NOW % 256 ))"
 
 check() { # nombre esperado obtenido
   if [ "$2" = "$3" ]; then printf '  OK   %-58s %s\n' "$1" "$3"; else printf '  FAIL %-58s esperado %s, obtenido %s\n' "$1" "$2" "$3"; FAILED=1; fi
 }
 field() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" | head -1; }
-code() { curl -s -o /tmp/fundigsac-smoke.json -w '%{http_code}' "$@"; }
+code() { curl -s -o /tmp/fundigsac-smoke.json -w '%{http_code}' -H "X-Forwarded-For: $CLIENT_IP" "$@"; }
 
 echo "Catálogo público"
 check "GET categorías" 200 "$(code "$B/api/v1/catalog/categories")"
@@ -83,6 +87,10 @@ check "GET directorio de cuentas" 200 "$(code "$B/api/v1/staff/accounts?kind=CUS
 check "GET indicadores (30 días)" 200 "$(code "$B/api/v1/staff/accounts/stats?range=30d" -H "Authorization: Bearer $PT")"
 check "GET actividad de cuentas" 200 "$(code "$B/api/v1/staff/accounts/activity?type=LOGIN" -H "Authorization: Bearer $PT")"
 check "GET filtro de directorio no válido" 400 "$(code "$B/api/v1/staff/accounts?status=BORRADA" -H "Authorization: Bearer $PT")"
+
+echo "Actuator solo en el puerto interno"
+check "GET /actuator/health por el puerto público" 401 "$(code "$B/actuator/health")"
+check "Puerto 8081 no publicado" 000 "$(curl -s -o /dev/null --connect-timeout 2 -w '%{http_code}' "${B%:*}:8081/actuator/health")"
 
 echo
 [ "$FAILED" = 0 ] && echo "Todo correcto. Folios: $FOLIO, $REC" || { echo "Hubo fallos."; exit 1; }

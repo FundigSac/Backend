@@ -47,13 +47,29 @@ class SecurityStampValidator implements OAuth2TokenValidator<Jwt> {
 			return OAuth2TokenValidatorResult.failure(REVOKED);
 		}
 		Object claim = jwt.getClaim("sv");
-		if (!(claim instanceof Number stamp)) {
+		if (!(claim instanceof Number number)) {
 			return OAuth2TokenValidatorResult.failure(REVOKED);
 		}
+		int stamp = number.intValue();
 		Optional<UserAccountRepository.SecurityState> state = this.cache.get(userId, this.accounts::findSecurityState);
-		boolean valid = state.isPresent() && state.get().status() == AccountStatus.ACTIVE
-				&& state.get().securityStamp() == stamp.intValue();
-		return valid ? OAuth2TokenValidatorResult.success() : OAuth2TokenValidatorResult.failure(REVOKED);
+		if (!accepts(state, stamp) && cacheMayBeBehind(state, stamp)) {
+			this.cache.invalidate(userId);
+			state = this.cache.get(userId, this.accounts::findSecurityState);
+		}
+		return accepts(state, stamp) ? OAuth2TokenValidatorResult.success() : OAuth2TokenValidatorResult.failure(REVOKED);
+	}
+
+	private static boolean accepts(Optional<UserAccountRepository.SecurityState> state, int stamp) {
+		return state.isPresent() && state.get().status() == AccountStatus.ACTIVE && state.get().securityStamp() == stamp;
+	}
+
+	/**
+	 * El sello solo aumenta. Un token firmado con un sello igual o mayor que el recordado se emitió después de la lectura
+	 * en caché: se vuelve a consultar para no rechazar la sesión recién abierta. Un sello menor es una revocación real y
+	 * no genera consultas adicionales.
+	 */
+	private static boolean cacheMayBeBehind(Optional<UserAccountRepository.SecurityState> state, int stamp) {
+		return state.isPresent() && stamp >= state.get().securityStamp();
 	}
 
 }

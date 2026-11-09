@@ -28,20 +28,65 @@ jobs:
           cache: maven
 
       # Unit and architecture tests (Surefire) plus integration tests against PostgreSQL in Testcontainers (Failsafe).
+      # JaCoCo runs inside verify and fails the build below the thresholds set in pom.xml.
       # mvnw is committed without the executable bit, so it runs through sh.
-      - name: Run tests
+      - name: Run tests and coverage check
         run: sh ./mvnw -B -ntp verify
 
-      - name: Upload test reports
-        if: failure()
+      - name: Upload test and coverage reports
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
             target/surefire-reports/
             target/failsafe-reports/
+            target/site/jacoco/
           if-no-files-found: ignore
           retention-days: 14
+
+  timezone:
+    name: Tests with the JVM far from Lima
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Business dates are computed in America/Lima; a test or query that relies on the JVM date fails here.
+      - name: Run tests with the JVM in UTC+14
+        run: sh ./mvnw -B -ntp verify -Duser.timezone=Pacific/Kiritimati
+
+  e2e:
+    name: Smoke and Postman against the Docker stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate throwaway secrets
+        run: sh scripts/generate-secrets.sh
+
+      - name: Start the stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Run smoke test
+        run: sh scripts/smoke-test.sh
+
+      - name: Install Postman CLI
+        run: curl -fsSL "https://dl-cli.pstmn.io/install/unix.sh" | sh
+
+      - name: Run Postman collection
+        run: sh postman/run.sh
+
+      - name: Show service logs
+        if: failure()
+        run: docker compose logs --no-color --tail 300
 
   docker:
     name: Docker image

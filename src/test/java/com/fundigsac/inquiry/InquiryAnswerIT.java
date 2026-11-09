@@ -65,8 +65,8 @@ class InquiryAnswerIT extends IntegrationTest {
 			.header("If-Match", etag(id, admin))).andExpect(status().isOk());
 		this.mvc.perform(authed(postJson("/api/v1/staff/inquiries/" + id + "/status", Map.of("status", "ANSWERED")), admin)
 			.header("If-Match", etag(id, admin))).andExpect(status().isOk());
-		Awaitility.await().pollDelay(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(5))
-			.untilAsserted(() -> assertThat(answers("sin.respuesta@agualimpia.pe")).isZero());
+		awaitEventsProcessed();
+		assertThat(answers("sin.respuesta@agualimpia.pe")).isZero();
 	}
 
 }

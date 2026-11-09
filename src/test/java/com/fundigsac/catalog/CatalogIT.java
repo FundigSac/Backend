@@ -3,7 +3,9 @@ package com.fundigsac.catalog;
 import org.junit.jupiter.api.Test;
 
 import com.fundigsac.support.IntegrationTest;
+import tools.jackson.databind.JsonNode;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
@@ -46,6 +48,39 @@ class CatalogIT extends IntegrationTest {
 		this.mvc.perform(get("/api/v1/catalog/products").param("category", "acoples").param("dn", "100").with(randomIp()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.totalItems").value(greaterThan(0)));
+	}
+
+	@Test
+	void filtersByFamily() throws Exception {
+		this.mvc.perform(get("/api/v1/catalog/products").param("family", "compuerta").param("size", "100").with(randomIp()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalItems").value(greaterThan(0)))
+			.andExpect(jsonPath("$.items[*].family.code").value(everyItem(org.hamcrest.Matchers.is("compuerta"))));
+	}
+
+	@Test
+	void filtersBySector() throws Exception {
+		JsonNode all = this.json.readTree(this.mvc.perform(get("/api/v1/catalog/products").param("size", "1").with(randomIp()))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString());
+		JsonNode filtered = this.json.readTree(this.mvc.perform(get("/api/v1/catalog/products").param("sector", "saneamiento").param("size", "100").with(randomIp()))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString());
+		assertThat(filtered.get("totalItems").asLong()).isPositive().isLessThan(all.get("totalItems").asLong());
+		String slug = filtered.get("items").get(0).get("slug").asString();
+		this.mvc.perform(get("/api/v1/catalog/products/" + slug).with(randomIp()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.sectors[*].slug").value(hasItem("saneamiento")));
+	}
+
+	@Test
+	void anUnknownFamilyOrSectorIsAValidSearchWithNoResults() throws Exception {
+		this.mvc.perform(get("/api/v1/catalog/products").param("family", "inventada").with(randomIp()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalItems").value(0));
+		this.mvc.perform(get("/api/v1/catalog/products").param("sector", "inventado").with(randomIp()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalItems").value(0));
 	}
 
 	@Test

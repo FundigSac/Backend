@@ -75,9 +75,12 @@ public class AuthenticationService {
 			throw invalidCredentials();
 		}
 		if (!this.hasher.matches(password, account.passwordHash())) {
-			account.recordFailedLogin(now, this.loginPolicy);
-			this.accounts.update(account);
-			this.events.publishFrom(account);
+			// Sin contraseña no hay nada que adivinar: contar el fallo solo daría a un anónimo una forma de bloquear la cuenta.
+			if (account.hasPassword()) {
+				account.recordFailedLogin(now, this.loginPolicy);
+				this.accounts.update(account);
+				this.events.publishFrom(account);
+			}
 			throw invalidCredentials();
 		}
 		if (account.status() == AccountStatus.PENDING_VERIFICATION) {

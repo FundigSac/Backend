@@ -63,7 +63,7 @@ public class StaffCodeLoginService {
 		IdentityProperties.Tokens config = this.properties.tokens();
 		CodeIssued issued = new CodeIssued(config.staffLoginCodeTtl().toSeconds(), config.staffLoginCodeResend().toSeconds());
 		Optional<UserAccount> found = parse(rawEmail).flatMap(this.accounts::findByEmail)
-			.filter((account) -> account.canRequestLoginCode(now));
+			.filter(UserAccount::canRequestLoginCode);
 		if (found.isEmpty()) {
 			return issued;
 		}
@@ -90,7 +90,7 @@ public class StaffCodeLoginService {
 		Instant now = this.clock.instant();
 		String code = rawCode == null ? "" : rawCode.strip();
 		UserAccount account = parse(rawEmail).flatMap(this.accounts::findByEmail)
-			.filter((a) -> a.canRequestLoginCode(now))
+			.filter(UserAccount::canRequestLoginCode)
 			.orElseThrow(StaffCodeLoginService::invalidCode);
 		StaffLoginCode current = this.codes.findLatest(account.id())
 			.filter((c) -> c.isUsable(now))

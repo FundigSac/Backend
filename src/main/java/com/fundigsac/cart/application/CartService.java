@@ -22,6 +22,7 @@ import com.fundigsac.identity.api.CustomerDirectory.CustomerContact;
 import com.fundigsac.identity.api.IdentityEvents.AccountDeleted;
 import com.fundigsac.quotation.api.QuoteSubmission;
 import com.fundigsac.shared.application.CurrentActor;
+import com.fundigsac.shared.application.Idempotency;
 import com.fundigsac.shared.domain.ForbiddenException;
 import com.fundigsac.shared.domain.RuleViolationException;
 import com.fundigsac.shared.domain.ValidationException;
@@ -55,16 +56,19 @@ public class CartService {
 
 	private final QuoteSubmission quotes;
 
+	private final Idempotency idempotency;
+
 	private final CurrentActor actor;
 
 	private final Clock clock;
 
 	CartService(CartRepository carts, CatalogLookup catalog, CustomerDirectory customers, QuoteSubmission quotes,
-			CurrentActor actor, Clock clock) {
+			Idempotency idempotency, CurrentActor actor, Clock clock) {
 		this.carts = carts;
 		this.catalog = catalog;
 		this.customers = customers;
 		this.quotes = quotes;
+		this.idempotency = idempotency;
 		this.actor = actor;
 		this.clock = clock;
 	}
@@ -112,13 +116,22 @@ public class CartService {
 		return save(cart);
 	}
 
-	/** Envía el carrito como solicitud de cotización (misma transacción: si falla, el carrito no se vacía). */
+	/**
+	 * Envía el carrito como solicitud de cotización (misma transacción: si falla, el carrito no se vacía). La clave de
+	 * idempotencia protege el envío del carrito y no la solicitud generada, porque un reintento ya llega con el carrito
+	 * vacío. Cada cliente tiene su propio ámbito de claves.
+	 */
 	@PreAuthorize(Authz.CUSTOMER)
 	@Transactional
 	public QuoteSubmission.Receipt submit(Checkout checkout, @Nullable String idempotencyKey) {
 		UUID me = this.actor.requireUserId();
 		CustomerContact contact = this.customers.findActiveCustomer(me)
 			.orElseThrow(() -> new ForbiddenException("ACCOUNT_INACTIVE", "La cuenta no está activa."));
+		return this.idempotency.execute("cart:" + me.toString().replace("-", ""), idempotencyKey, checkout,
+				() -> register(me, contact, checkout), QuoteSubmission.Receipt::folio, this.quotes::receipt);
+	}
+
+	private QuoteSubmission.Receipt register(UUID me, CustomerContact contact, Checkout checkout) {
 		QuoteCart cart = current();
 		if (cart.items().isEmpty()) {
 			throw new RuleViolationException("CART_EMPTY", "Agregue productos al carrito antes de solicitar la cotización.");
@@ -135,7 +148,7 @@ public class CartService {
 				new QuoteSubmission.Project(checkout.projectType(), checkout.deliveryDepartment(), checkout.deliveryPlace(),
 						checkout.requestedDeliveryDate(), checkout.message()),
 				lines, checkout.privacyNoticeVersion(), me);
-		QuoteSubmission.Receipt receipt = this.quotes.submit(request, idempotencyKey);
+		QuoteSubmission.Receipt receipt = this.quotes.submit(request, null);
 		cart.clear(this.clock.instant());
 		save(cart);
 		return receipt;

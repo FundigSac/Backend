@@ -5,8 +5,8 @@ import org.jspecify.annotations.Nullable;
 import com.fundigsac.shared.domain.ValidationException;
 
 /**
- * Control de concurrencia HTTP: GET devuelve ETag con la versión del registro y las modificaciones del personal
- * exigen If-Match con esa versión (428 si falta, 412 si cambió).
+ * Control de concurrencia HTTP: GET devuelve ETag con la versión del registro y las operaciones del personal que
+ * cambian un registro versionado exigen If-Match con esa versión (428 si falta, 412 si cambió).
  */
 public final class ETags {
 

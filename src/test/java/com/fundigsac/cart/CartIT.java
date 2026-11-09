@@ -65,7 +65,7 @@ class CartIT extends IntegrationTest {
 
 	@Test
 	void staffCannotUseTheCustomerCart() throws Exception {
-		this.mvc.perform(authed(get("/api/v1/cart").with(randomIp()), adminToken())).andExpect(status().isForbidden());
+		this.mvc.perform(authed(get("/api/v1/cart").with(randomIp()), adminToken())).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
 	}
 
 }
