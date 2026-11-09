@@ -32,6 +32,9 @@ if [ ! -s "$dir/jwt_private_key" ]; then
 else
   echo "  existe: jwt_private_key"
 fi
+# openssl crea la clave con 0600: el backend corre como 10001 y en Linux no podría leerla.
+# La carpeta (700) es la que impide que otros usuarios del equipo lleguen a los archivos.
+chmod 644 "$dir"/*
 
 echo
 echo "Administrador inicial: admin@fundigsac.local"
